@@ -76,7 +76,7 @@ export default function MapView({
       style: 'mapbox://styles/mapbox/streets-v12',
       center: CENTER,
       zoom: DEFAULT_ZOOM,
-      minZoom: 13,
+      minZoom: 15,
       maxZoom: 19,
       maxBounds: MAX_BOUNDS,
     })
