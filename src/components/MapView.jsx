@@ -60,6 +60,9 @@ export default function MapView({
   const popupRootRef = useRef(null)
   const hoveredIdRef = useRef(null)
   const unitsRef = useRef(units)
+  // Prevents the mapStyle effect from calling setStyle on the initial render,
+  // which would cancel the in-progress map load and drop the first data update.
+  const mapStyleReady = useRef(false)
 
   // Keep unitsRef in sync so popup callbacks always see latest data
   useEffect(() => {
@@ -190,10 +193,12 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Update source data when units change
+  // Update source data when units change.
+  // Checks that the source exists rather than isStyleLoaded() — the latter can
+  // return false during the style-reload window and silently drop the update.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
+    if (!map) return
     const source = map.getSource(SOURCE_ID)
     if (source) source.setData(unitsToGeoJSON(units))
   }, [units])
@@ -223,8 +228,13 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTarget])
 
-  // Toggle map style
+  // Toggle map style — skips the initial render so it doesn't call setStyle
+  // while the map is already loading its default style.
   useEffect(() => {
+    if (!mapStyleReady.current) {
+      mapStyleReady.current = true
+      return
+    }
     const map = mapRef.current
     if (!map) return
     const styleUrl = mapStyle === 'satellite'

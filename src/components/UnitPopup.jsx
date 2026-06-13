@@ -79,7 +79,7 @@ export default function UnitPopup({ unit, onClose, onSave }) {
 
       {/* Status badge */}
       <div className="px-4 pb-3">
-        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[status]}`}>
+        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BUTTON[status]}`}>
           {STATUS_LABELS[status]}
         </span>
       </div>
