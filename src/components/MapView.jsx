@@ -6,7 +6,7 @@ import UnitPopup from './UnitPopup'
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN
 
-const CENTER = [-75.0836, 40.1872]
+const CENTER = [-75.900, 40.1865]
 const DEFAULT_ZOOM = 15
 const SOURCE_ID = 'units'
 const LAYER_ID = 'units-circles'
@@ -15,7 +15,7 @@ const LABEL_LAYER_ID = 'units-labels'
 
 // Bounding box that keeps the user near the HOA — allows surrounding roads
 // but prevents wandering across Pennsylvania
-const MAX_BOUNDS = [[-75.095, 40.180], [-75.070, 40.200]]
+const MAX_BOUNDS = [[-75.105, 40.175], [-75.065, 40.205]]
 
 const STATUS_COLOR_EXPR = [
   'match', ['get', 'status'],
