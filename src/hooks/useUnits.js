@@ -18,21 +18,20 @@ export function useUnits() {
       const { data: dbRows, error: fetchErr } = await supabase
         .from('units')
         .select('*')
+        .limit(5000)
       if (fetchErr) throw fetchErr
 
-      // Index Supabase rows by parcel_id (fallback: full_address)
-      const dbByParcel = {}
+      // Index Supabase rows by full_address — the unique identifier for every unit
       const dbByAddress = {}
       for (const row of (dbRows || [])) {
-        if (row.parcel_id) dbByParcel[row.parcel_id] = row
-        else if (row.full_address) dbByAddress[row.full_address] = row
+        if (row.full_address) dbByAddress[row.full_address] = row
       }
 
       // Merge: GeoJSON drives coords/identity, Supabase drives status/notes/id
       const merged = geojson.features.map((f) => {
         const parcelId = f.properties.ParcelID || ''
         const fullAddr = f.properties.Full_Addr || ''
-        const dbRow = (parcelId && dbByParcel[parcelId]) || dbByAddress[fullAddr] || null
+        const dbRow = dbByAddress[fullAddr] || null
 
         return {
           id: dbRow?.id || null,
@@ -103,8 +102,7 @@ export function useUnits() {
 
     setUnits((prev) => prev.map((u) => {
       if (unit.id && u.id === unit.id) return updatedUnit
-      if (!unit.id && unit.parcel_id && u.parcel_id === unit.parcel_id) return updatedUnit
-      if (!unit.id && !unit.parcel_id && u.full_address === unit.full_address) return updatedUnit
+      if (!unit.id && u.full_address === unit.full_address) return updatedUnit
       return u
     }))
 

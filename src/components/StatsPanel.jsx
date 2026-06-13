@@ -4,7 +4,7 @@ const STATUS_CONFIG = [
   { value: 'needs_work', label: 'Needs Work', color: '#ef4444', dot: 'bg-red-500' },
   { value: 'in_progress', label: 'In Progress', color: '#eab308', dot: 'bg-yellow-500' },
   { value: 'completed', label: 'Completed', color: '#22c55e', dot: 'bg-green-500' },
-  { value: 'none', label: 'No Status', color: '#94a3b8', dot: 'bg-slate-400' },
+  { value: 'none', label: 'No Status', color: '#60a5fa', dot: 'bg-blue-400' },
 ]
 
 export default function StatsPanel({ units, activeFilter, onFilterChange, onSearch, loading }) {

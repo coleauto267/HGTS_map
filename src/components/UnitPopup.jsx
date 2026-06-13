@@ -8,14 +8,14 @@ const STATUS_OPTIONS = [
 ]
 
 const STATUS_BUTTON = {
-  none:        'bg-slate-500 hover:bg-slate-400 text-white',
+  none:        'bg-blue-400 hover:bg-blue-300 text-white',
   needs_work:  'bg-red-500 hover:bg-red-400 text-white',
   in_progress: 'bg-yellow-500 hover:bg-yellow-400 text-black',
   completed:   'bg-green-500 hover:bg-green-400 text-white',
 }
 
 const STATUS_RING = {
-  none:        'ring-2 ring-offset-2 ring-offset-slate-950 ring-slate-300',
+  none:        'ring-2 ring-offset-2 ring-offset-slate-950 ring-blue-300',
   needs_work:  'ring-2 ring-offset-2 ring-offset-slate-950 ring-red-300',
   in_progress: 'ring-2 ring-offset-2 ring-offset-slate-950 ring-yellow-300',
   completed:   'ring-2 ring-offset-2 ring-offset-slate-950 ring-green-300',

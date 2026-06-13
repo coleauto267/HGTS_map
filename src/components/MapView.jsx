@@ -22,7 +22,7 @@ const STATUS_COLOR_EXPR = [
   'needs_work', '#ef4444',
   'in_progress', '#eab308',
   'completed', '#22c55e',
-  '#94a3b8',
+  '#60a5fa',
 ]
 
 function unitsToGeoJSON(units) {
