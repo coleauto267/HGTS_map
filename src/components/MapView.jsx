@@ -171,7 +171,10 @@ export default function MapView({
       const handleUnitClick = (e) => {
         const props = e.features[0]?.properties
         if (!props) return
-        const unit = unitsRef.current.find((u) => u.id === props.id)
+        const unit = unitsRef.current.find((u) =>
+          u.id === props.id ||
+          (!props.id && u.full_address === props.full_address)
+        )
         if (!unit) return
         openPopup(map, unit, e.lngLat)
       }
@@ -312,7 +315,10 @@ export default function MapView({
       const handleUnitClick = (e) => {
         const props = e.features[0]?.properties
         if (!props) return
-        const unit = unitsRef.current.find((u) => u.id === props.id)
+        const unit = unitsRef.current.find((u) =>
+          u.id === props.id ||
+          (!props.id && u.full_address === props.full_address)
+        )
         if (!unit) return
         openPopup(map, unit, e.lngLat)
       }
