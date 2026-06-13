@@ -15,7 +15,7 @@ const LABEL_LAYER_ID = 'units-labels'
 
 // Bounding box that keeps the user near the HOA — allows surrounding roads
 // but prevents wandering across Pennsylvania
-const MAX_BOUNDS = [[-75.16, 40.12], [-75.00, 40.25]]
+const MAX_BOUNDS = [[-75.095, 40.180], [-75.070, 40.200]]
 
 const STATUS_COLOR_EXPR = [
   'match', ['get', 'status'],
