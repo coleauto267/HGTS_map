@@ -100,9 +100,9 @@ export default function MapView({
           'circle-color': STATUS_COLOR_EXPR,
           'circle-radius': [
             'interpolate', ['linear'], ['zoom'],
-            13, 3,
-            14, 5,
-            15, 6,
+            13, 2,
+            14, 3,
+            15, 4,
             17, 8,
           ],
           'circle-stroke-width': 1.5,
@@ -120,9 +120,9 @@ export default function MapView({
           'circle-color': STATUS_COLOR_EXPR,
           'circle-radius': [
             'interpolate', ['linear'], ['zoom'],
-            13, 5,
-            14, 7,
-            15, 9,
+            13, 3,
+            14, 5,
+            15, 6,
             17, 11,
           ],
           'circle-stroke-width': 2,
@@ -140,7 +140,7 @@ export default function MapView({
         layout: {
           'text-field': ['get', 'addr_num'],
           'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 13, 7, 15, 9, 17, 12],
+          'text-size': ['step', ['zoom'], 0, 16, 9, 17, 12],
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
@@ -255,7 +255,7 @@ export default function MapView({
           'circle-color': STATUS_COLOR_EXPR,
           'circle-radius': [
             'interpolate', ['linear'], ['zoom'],
-            13, 3, 14, 5, 15, 6, 17, 8,
+            13, 2, 14, 3, 15, 4, 17, 8,
           ],
           'circle-stroke-width': 1.5,
           'circle-stroke-color': 'rgba(255,255,255,0.6)',
@@ -270,7 +270,7 @@ export default function MapView({
           'circle-color': STATUS_COLOR_EXPR,
           'circle-radius': [
             'interpolate', ['linear'], ['zoom'],
-            13, 5, 14, 7, 15, 9, 17, 11,
+            13, 3, 14, 5, 15, 6, 17, 11,
           ],
           'circle-stroke-width': 2,
           'circle-stroke-color': '#ffffff',
@@ -285,7 +285,7 @@ export default function MapView({
         layout: {
           'text-field': ['get', 'addr_num'],
           'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 13, 7, 15, 9, 17, 12],
+          'text-size': ['step', ['zoom'], 0, 16, 9, 17, 12],
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
@@ -345,8 +345,8 @@ export default function MapView({
         <UnitPopup
           unit={currentUnit}
           onClose={closePopup}
-          onSave={async (id, updates) => {
-            const updated = await onUnitUpdate(id, updates)
+          onSave={async (unit, updates) => {
+            const updated = await onUnitUpdate(unit, updates)
             renderPopup(updated)
           }}
         />

@@ -6,75 +6,109 @@ export function useUnits() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const seedFromGeoJSON = useCallback(async () => {
-    const res = await fetch('/HGTS_Addresses.geojson')
-    const geojson = await res.json()
-
-    const rows = geojson.features.map((f) => ({
-      full_address: f.properties.Full_Addr || '',
-      street_name: f.properties.St_Name || '',
-      parcel_id: f.properties.ParcelID || '',
-      lat: f.properties.Lat ?? f.geometry?.coordinates?.[1] ?? null,
-      lon: f.properties.Long ?? f.geometry?.coordinates?.[0] ?? null,
-      status: 'none',
-      notes: '',
-    }))
-
-    // Insert in batches of 200 to stay under payload limits
-    const batchSize = 200
-    const inserted = []
-    for (let i = 0; i < rows.length; i += batchSize) {
-      const batch = rows.slice(i, i + batchSize)
-      const { data, error } = await supabase.from('units').insert(batch).select()
-      if (error) throw error
-      inserted.push(...data)
-    }
-    return inserted
-  }, [])
-
   const loadUnits = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const { count, error: countErr } = await supabase
-        .from('units')
-        .select('*', { count: 'exact', head: true })
-      if (countErr) throw countErr
+      // GeoJSON is always the source of truth for addresses + coordinates
+      const res = await fetch('/HGTS_Addresses.geojson')
+      const geojson = await res.json()
 
-      let data
-      if (count === 0) {
-        data = await seedFromGeoJSON()
-      } else {
-        const { data: fetched, error: fetchErr } = await supabase
-          .from('units')
-          .select('*')
-          .order('full_address')
-        if (fetchErr) throw fetchErr
-        data = fetched
+      // Load all Supabase rows for status + notes (no pagination needed — 732 rows)
+      const { data: dbRows, error: fetchErr } = await supabase
+        .from('units')
+        .select('*')
+      if (fetchErr) throw fetchErr
+
+      // Index Supabase rows by parcel_id (fallback: full_address)
+      const dbByParcel = {}
+      const dbByAddress = {}
+      for (const row of (dbRows || [])) {
+        if (row.parcel_id) dbByParcel[row.parcel_id] = row
+        else if (row.full_address) dbByAddress[row.full_address] = row
       }
-      setUnits(data)
+
+      // Merge: GeoJSON drives coords/identity, Supabase drives status/notes/id
+      const merged = geojson.features.map((f) => {
+        const parcelId = f.properties.ParcelID || ''
+        const fullAddr = f.properties.Full_Addr || ''
+        const dbRow = (parcelId && dbByParcel[parcelId]) || dbByAddress[fullAddr] || null
+
+        return {
+          id: dbRow?.id || null,
+          full_address: fullAddr,
+          street_name: f.properties.St_Name || '',
+          parcel_id: parcelId,
+          post_code: f.properties.Post_Code || '18974',
+          lat: f.properties.Lat ?? f.geometry?.coordinates?.[1] ?? null,
+          lon: f.properties.Long ?? f.geometry?.coordinates?.[0] ?? null,
+          status: dbRow?.status || 'none',
+          notes: dbRow?.notes || '',
+        }
+      })
+
+      setUnits(merged)
     } catch (err) {
       console.error('Failed to load units:', err)
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [seedFromGeoJSON])
+  }, [])
 
   useEffect(() => {
     loadUnits()
   }, [loadUnits])
 
-  const updateUnit = useCallback(async (id, updates) => {
-    const { data, error } = await supabase
-      .from('units')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    setUnits((prev) => prev.map((u) => (u.id === id ? data : u)))
-    return data
+  // Takes the full unit object (not just id) so we can insert if it hasn't
+  // been saved to Supabase yet (id === null).
+  const updateUnit = useCallback(async (unit, updates) => {
+    const now = new Date().toISOString()
+    let dbRow
+
+    if (unit.id) {
+      const { data, error: err } = await supabase
+        .from('units')
+        .update({ ...updates, updated_at: now })
+        .eq('id', unit.id)
+        .select()
+        .single()
+      if (err) throw err
+      dbRow = data
+    } else {
+      // First time this unit is saved — insert into Supabase
+      const { data, error: err } = await supabase
+        .from('units')
+        .insert({
+          full_address: unit.full_address,
+          street_name: unit.street_name,
+          parcel_id: unit.parcel_id,
+          lat: unit.lat,
+          lon: unit.lon,
+          ...updates,
+          updated_at: now,
+        })
+        .select()
+        .single()
+      if (err) throw err
+      dbRow = data
+    }
+
+    const updatedUnit = {
+      ...unit,
+      id: dbRow.id,
+      status: dbRow.status,
+      notes: dbRow.notes,
+    }
+
+    setUnits((prev) => prev.map((u) => {
+      if (unit.id && u.id === unit.id) return updatedUnit
+      if (!unit.id && unit.parcel_id && u.parcel_id === unit.parcel_id) return updatedUnit
+      if (!unit.id && !unit.parcel_id && u.full_address === unit.full_address) return updatedUnit
+      return u
+    }))
+
+    return updatedUnit
   }, [])
 
   return { units, loading, error, updateUnit }

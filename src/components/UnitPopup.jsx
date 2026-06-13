@@ -43,7 +43,7 @@ export default function UnitPopup({ unit, onClose, onSave }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await onSave(unit.id, { status, notes })
+      await onSave(unit, { status, notes })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
