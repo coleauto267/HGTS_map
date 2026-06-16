@@ -142,7 +142,7 @@ export default function MapView({
         layout: {
           'text-field': ['get', 'addr_num'],
           'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['step', ['zoom'], 0, 16, 9, 17, 12],
+          'text-size': ['step', ['zoom'], 0, 17, 9, 19, 12],
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
