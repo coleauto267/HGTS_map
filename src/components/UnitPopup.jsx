@@ -31,19 +31,21 @@ const STATUS_LABELS = {
 export default function UnitPopup({ unit, onClose, onSave }) {
   const [status, setStatus] = useState(unit.status)
   const [notes, setNotes] = useState(unit.notes || '')
+  const [isUrgent, setIsUrgent] = useState(unit.is_urgent || false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     setStatus(unit.status)
     setNotes(unit.notes || '')
+    setIsUrgent(unit.is_urgent || false)
     setSaved(false)
   }, [unit.id])
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await onSave(unit, { status, notes })
+      await onSave(unit, { status, notes, is_urgent: isUrgent })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
@@ -103,6 +105,22 @@ export default function UnitPopup({ unit, onClose, onSave }) {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Urgency toggle */}
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${isUrgent ? 'bg-red-500/15' : ''}`}>
+          <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          <span className="text-white text-sm flex-1">Mark as Urgent</span>
+          <button
+            onClick={() => setIsUrgent((v) => !v)}
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isUrgent ? 'bg-red-500' : 'bg-slate-600'}`}
+            role="switch"
+            aria-checked={isUrgent}
+          >
+            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${isUrgent ? 'translate-x-4' : 'translate-x-0'}`} />
+          </button>
         </div>
 
         {/* Notes */}

@@ -43,6 +43,7 @@ export function useUnits() {
           lon: f.properties.Long ?? f.geometry?.coordinates?.[0] ?? null,
           status: dbRow?.status || 'none',
           notes: dbRow?.notes || '',
+          is_urgent: dbRow?.is_urgent || false,
         }
       })
 
@@ -98,6 +99,7 @@ export function useUnits() {
       id: dbRow.id,
       status: dbRow.status,
       notes: dbRow.notes,
+      is_urgent: dbRow.is_urgent,
     }
 
     setUnits((prev) => prev.map((u) => {

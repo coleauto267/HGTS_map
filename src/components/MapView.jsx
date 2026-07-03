@@ -33,6 +33,26 @@ function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
   })
 
   map.addLayer({
+    id: 'units-urgent-ring',
+    type: 'circle',
+    source: SOURCE_ID,
+    filter: ['==', ['get', 'is_urgent'], true],
+    paint: {
+      'circle-color': 'rgba(0,0,0,0)',
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 5,
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        13, 5,
+        14, 6,
+        15, 7,
+        17, 13,
+        19, 20,
+      ],
+    },
+  })
+
+  map.addLayer({
     id: LAYER_ID,
     type: 'circle',
     source: SOURCE_ID,
@@ -135,6 +155,7 @@ function unitsToGeoJSON(units) {
           parcel_id: u.parcel_id || '',
           status: u.status,
           notes: u.notes || '',
+          is_urgent: u.is_urgent || false,
           addr_num: u.full_address?.split(' ')[0] || '',
         },
       })),
