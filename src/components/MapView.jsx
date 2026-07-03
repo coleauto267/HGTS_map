@@ -25,6 +25,101 @@ const STATUS_COLOR_EXPR = [
   '#60a5fa',
 ]
 
+function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
+  map.addSource(SOURCE_ID, {
+    type: 'geojson',
+    data: unitsToGeoJSON(unitsRef.current),
+    generateId: false,
+  })
+
+  map.addLayer({
+    id: LAYER_ID,
+    type: 'circle',
+    source: SOURCE_ID,
+    paint: {
+      'circle-color': STATUS_COLOR_EXPR,
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        13, 2,
+        14, 3,
+        15, 4,
+        17, 10,
+        19, 16,
+      ],
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': 'rgba(255,255,255,0.6)',
+      'circle-opacity': 0.9,
+    },
+  })
+
+  map.addLayer({
+    id: HOVER_LAYER_ID,
+    type: 'circle',
+    source: SOURCE_ID,
+    paint: {
+      'circle-color': STATUS_COLOR_EXPR,
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        13, 3,
+        14, 5,
+        15, 6,
+        17, 13,
+        19, 19,
+      ],
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#ffffff',
+      'circle-opacity': 1,
+    },
+    filter: ['==', ['get', 'id'], ''],
+  })
+
+  map.addLayer({
+    id: LABEL_LAYER_ID,
+    type: 'symbol',
+    source: SOURCE_ID,
+    layout: {
+      'text-field': ['get', 'addr_num'],
+      'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+      'text-size': ['step', ['zoom'], 0, 17.5, 9, 19, 12],
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': 'rgba(0,0,0,0.75)',
+      'text-halo-width': 1,
+    },
+  })
+
+  map.on('mousemove', LAYER_ID, (e) => {
+    map.getCanvas().style.cursor = 'pointer'
+    const id = e.features[0]?.properties?.id
+    if (id && id !== hoveredIdRef.current) {
+      hoveredIdRef.current = id
+      map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'id'], id])
+    }
+  })
+
+  map.on('mouseleave', LAYER_ID, () => {
+    map.getCanvas().style.cursor = ''
+    hoveredIdRef.current = null
+    map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'id'], ''])
+  })
+
+  const handleUnitClick = (e) => {
+    const props = e.features[0]?.properties
+    if (!props) return
+    const unit = unitsRef.current.find((u) =>
+      u.id === props.id ||
+      (!props.id && u.full_address === props.full_address)
+    )
+    if (!unit) return
+    openPopup(map, unit, e.lngLat)
+  }
+  map.on('click', LAYER_ID, handleUnitClick)
+  map.on('click', LABEL_LAYER_ID, handleUnitClick)
+}
+
 function unitsToGeoJSON(units) {
   return {
     type: 'FeatureCollection',
@@ -85,103 +180,7 @@ export default function MapView({
     map.addControl(new mapboxgl.ScaleControl(), 'bottom-left')
 
     map.on('load', () => {
-      map.addSource(SOURCE_ID, {
-        type: 'geojson',
-        data: unitsToGeoJSON(unitsRef.current),
-        generateId: false,
-      })
-
-      // Main circle layer
-      map.addLayer({
-        id: LAYER_ID,
-        type: 'circle',
-        source: SOURCE_ID,
-        paint: {
-          'circle-color': STATUS_COLOR_EXPR,
-          'circle-radius': [
-            'interpolate', ['linear'], ['zoom'],
-            13, 2,
-            14, 3,
-            15, 4,
-            17, 10,
-            19, 16,
-          ],
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': 'rgba(255,255,255,0.6)',
-          'circle-opacity': 0.9,
-        },
-      })
-
-      // Hover highlight layer (same source, filters to hovered feature)
-      map.addLayer({
-        id: HOVER_LAYER_ID,
-        type: 'circle',
-        source: SOURCE_ID,
-        paint: {
-          'circle-color': STATUS_COLOR_EXPR,
-          'circle-radius': [
-            'interpolate', ['linear'], ['zoom'],
-            13, 3,
-            14, 5,
-            15, 6,
-            17, 13,
-            19, 19,
-          ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff',
-          'circle-opacity': 1,
-        },
-        filter: ['==', ['get', 'id'], ''],
-      })
-
-      // Address number labels on top of circles
-      map.addLayer({
-        id: LABEL_LAYER_ID,
-        type: 'symbol',
-        source: SOURCE_ID,
-        layout: {
-          'text-field': ['get', 'addr_num'],
-          'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['step', ['zoom'], 0, 17, 9, 19, 12],
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-        },
-        paint: {
-          'text-color': '#ffffff',
-          'text-halo-color': 'rgba(0,0,0,0.75)',
-          'text-halo-width': 1,
-        },
-      })
-
-      // Hover interactions
-      map.on('mousemove', LAYER_ID, (e) => {
-        map.getCanvas().style.cursor = 'pointer'
-        const id = e.features[0]?.properties?.id
-        if (id && id !== hoveredIdRef.current) {
-          hoveredIdRef.current = id
-          map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'id'], id])
-        }
-      })
-
-      map.on('mouseleave', LAYER_ID, () => {
-        map.getCanvas().style.cursor = ''
-        hoveredIdRef.current = null
-        map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'id'], ''])
-      })
-
-      // Click to open popup — listen on both circles and labels (labels sit on top)
-      const handleUnitClick = (e) => {
-        const props = e.features[0]?.properties
-        if (!props) return
-        const unit = unitsRef.current.find((u) =>
-          u.id === props.id ||
-          (!props.id && u.full_address === props.full_address)
-        )
-        if (!unit) return
-        openPopup(map, unit, e.lngLat)
-      }
-      map.on('click', LAYER_ID, handleUnitClick)
-      map.on('click', LABEL_LAYER_ID, handleUnitClick)
+      addMapLayers(map, unitsRef, hoveredIdRef, openPopup)
 
       // Close popup on background click
       map.on('click', (e) => {
@@ -248,84 +247,7 @@ export default function MapView({
 
     // Re-add layers after style change
     map.once('style.load', () => {
-      map.addSource(SOURCE_ID, {
-        type: 'geojson',
-        data: unitsToGeoJSON(unitsRef.current),
-      })
-      map.addLayer({
-        id: LAYER_ID,
-        type: 'circle',
-        source: SOURCE_ID,
-        paint: {
-          'circle-color': STATUS_COLOR_EXPR,
-          'circle-radius': [
-            'interpolate', ['linear'], ['zoom'],
-            13, 2, 14, 3, 15, 4, 17, 8,
-          ],
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': 'rgba(255,255,255,0.6)',
-          'circle-opacity': 0.9,
-        },
-      })
-      map.addLayer({
-        id: HOVER_LAYER_ID,
-        type: 'circle',
-        source: SOURCE_ID,
-        paint: {
-          'circle-color': STATUS_COLOR_EXPR,
-          'circle-radius': [
-            'interpolate', ['linear'], ['zoom'],
-            13, 3, 14, 5, 15, 6, 17, 11,
-          ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff',
-          'circle-opacity': 1,
-        },
-        filter: ['==', ['get', 'id'], ''],
-      })
-      map.addLayer({
-        id: LABEL_LAYER_ID,
-        type: 'symbol',
-        source: SOURCE_ID,
-        layout: {
-          'text-field': ['get', 'addr_num'],
-          'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['step', ['zoom'], 0, 16, 9, 17, 12],
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-        },
-        paint: {
-          'text-color': '#ffffff',
-          'text-halo-color': 'rgba(0,0,0,0.75)',
-          'text-halo-width': 1,
-        },
-      })
-      // Re-bind events after style change
-      map.on('mousemove', LAYER_ID, (e) => {
-        map.getCanvas().style.cursor = 'pointer'
-        const id = e.features[0]?.properties?.id
-        if (id && id !== hoveredIdRef.current) {
-          hoveredIdRef.current = id
-          map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'id'], id])
-        }
-      })
-      map.on('mouseleave', LAYER_ID, () => {
-        map.getCanvas().style.cursor = ''
-        hoveredIdRef.current = null
-        map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'id'], ''])
-      })
-      const handleUnitClick = (e) => {
-        const props = e.features[0]?.properties
-        if (!props) return
-        const unit = unitsRef.current.find((u) =>
-          u.id === props.id ||
-          (!props.id && u.full_address === props.full_address)
-        )
-        if (!unit) return
-        openPopup(map, unit, e.lngLat)
-      }
-      map.on('click', LAYER_ID, handleUnitClick)
-      map.on('click', LABEL_LAYER_ID, handleUnitClick)
+      addMapLayers(map, unitsRef, hoveredIdRef, openPopup)
     })
     map.setStyle(styleUrl)
     // eslint-disable-next-line react-hooks/exhaustive-deps
