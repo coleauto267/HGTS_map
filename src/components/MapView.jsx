@@ -12,6 +12,7 @@ const SOURCE_ID = 'units'
 const LAYER_ID = 'units-circles'
 const HOVER_LAYER_ID = 'units-circles-hover'
 const LABEL_LAYER_ID = 'units-labels'
+const URGENT_RING_LAYER_ID = 'units-urgent-ring'
 
 // Bounding box that keeps the user near the HOA — allows surrounding roads
 // but prevents wandering across Pennsylvania
@@ -33,7 +34,7 @@ function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
   })
 
   map.addLayer({
-    id: 'units-urgent-ring',
+    id: URGENT_RING_LAYER_ID,
     type: 'circle',
     source: SOURCE_ID,
     filter: ['==', ['get', 'is_urgent'], true],
@@ -235,6 +236,10 @@ export default function MapView({
     const filter = activeFilter ? ['==', ['get', 'status'], activeFilter] : null
     map.setFilter(LAYER_ID, filter)
     map.setFilter(LABEL_LAYER_ID, filter)
+    const urgentFilter = activeFilter
+      ? ['all', ['==', ['get', 'is_urgent'], true], ['==', ['get', 'status'], activeFilter]]
+      : ['==', ['get', 'is_urgent'], true]
+    map.setFilter(URGENT_RING_LAYER_ID, urgentFilter)
   }, [activeFilter])
 
   // Fly to search target
