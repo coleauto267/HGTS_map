@@ -26,7 +26,9 @@ body {
   font-family: inherit;
 }
 
-.mapboxgl-popup-content {
+/* Higher specificity than mapbox-gl.css's own .mapboxgl-popup-content rule so this
+   reset always wins regardless of CSS bundle order (mapbox-gl.css loads after this file) */
+.mapboxgl-popup .mapboxgl-popup-content {
   padding: 0;
   background: transparent;
   box-shadow: none;

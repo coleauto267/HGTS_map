@@ -56,7 +56,7 @@ export default function StatsPanel({ units, activeFilter, onFilterChange, onSear
       style={{ background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(12px)' }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-white/25">
         <div>
           <h1 className="text-white font-bold text-sm leading-tight">
             Warminster Heights
@@ -80,7 +80,7 @@ export default function StatsPanel({ units, activeFilter, onFilterChange, onSear
       {!collapsed && (
         <>
           {/* Search */}
-          <div className="px-3 py-2 border-b border-white/10">
+          <div className="px-3 py-2 border-b-2 border-white/25">
             <form onSubmit={handleSearch} className="flex gap-2">
               <input
                 type="text"
@@ -166,14 +166,14 @@ export default function StatsPanel({ units, activeFilter, onFilterChange, onSear
             )}
 
             {!loading && (
-              <div className="pt-1 mt-1 border-t border-white/10 flex justify-between px-2.5 text-xs text-slate-500">
+              <div className="pt-1 mt-1 border-t-2 border-white/25 flex justify-between px-2.5 text-xs text-slate-500">
                 <span>Total</span>
                 <span className="font-mono">{units.length}</span>
               </div>
             )}
 
             {!loading && LISTABLE_STATUSES.includes(activeFilter) && (
-              <div className="pt-2 mt-1 border-t border-white/10">
+              <div className="pt-2 mt-1 border-t-2 border-white/25">
                 <p className="text-slate-400 text-xs uppercase tracking-wider font-medium mb-1.5 px-0.5">
                   Addresses ({filteredUnits.length})
                 </p>

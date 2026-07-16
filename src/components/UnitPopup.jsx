@@ -7,6 +7,7 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completed' },
 ]
 
+// Solid pill used for the read-only "current status" badge
 const STATUS_BUTTON = {
   none:        'bg-blue-400 hover:bg-blue-300 text-white',
   needs_work:  'bg-red-500 hover:bg-red-400 text-white',
@@ -14,12 +15,29 @@ const STATUS_BUTTON = {
   completed:   'bg-green-500 hover:bg-green-400 text-white',
 }
 
-const STATUS_RING = {
-  none:        'ring-2 ring-offset-2 ring-offset-slate-950 ring-blue-300',
-  needs_work:  'ring-2 ring-offset-2 ring-offset-slate-950 ring-red-300',
-  in_progress: 'ring-2 ring-offset-2 ring-offset-slate-950 ring-yellow-300',
-  completed:   'ring-2 ring-offset-2 ring-offset-slate-950 ring-green-300',
+// Interactive status buttons: muted/outlined when unselected, colored + ring when selected
+// (mirrors the filter-chip pattern in StatsPanel so selection state is unambiguous)
+const STATUS_CHIP = {
+  none: {
+    dot: 'bg-blue-400',
+    active: 'bg-blue-400/20 border-blue-400/70 ring-1 ring-blue-400/40 text-white',
+  },
+  needs_work: {
+    dot: 'bg-red-500',
+    active: 'bg-red-500/20 border-red-500/70 ring-1 ring-red-500/40 text-white',
+  },
+  in_progress: {
+    dot: 'bg-yellow-500',
+    active: 'bg-yellow-500/20 border-yellow-500/70 ring-1 ring-yellow-500/40 text-white',
+  },
+  completed: {
+    dot: 'bg-green-500',
+    active: 'bg-green-500/20 border-green-500/70 ring-1 ring-green-500/40 text-white',
+  },
 }
+
+const STATUS_CHIP_INACTIVE =
+  'bg-slate-800/70 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'
 
 const STATUS_LABELS = {
   none: 'No Status',
@@ -56,10 +74,10 @@ export default function UnitPopup({ unit, onClose, onSave }) {
   }
 
   return (
-    <div className="w-72 rounded-xl overflow-hidden shadow-2xl border border-white/10"
+    <div className="w-72 rounded-xl overflow-hidden shadow-2xl"
          style={{ background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)' }}>
       {/* Header */}
-      <div className="flex items-start justify-between p-4 pb-2">
+      <div className="flex items-start justify-between p-4 pb-3 border-b-2 border-white/30">
         <div className="flex-1 min-w-0">
           <h3 className="text-white font-bold text-lg leading-tight truncate">
             {unit.full_address}
@@ -70,7 +88,7 @@ export default function UnitPopup({ unit, onClose, onSave }) {
         </div>
         <button
           onClick={onClose}
-          className="ml-2 mt-0.5 text-slate-500 hover:text-white transition-colors flex-shrink-0"
+          className="ml-2 mt-0.5 text-slate-500 hover:text-white transition-colors flex-shrink-0 cursor-pointer"
           aria-label="Close"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -80,35 +98,43 @@ export default function UnitPopup({ unit, onClose, onSave }) {
       </div>
 
       {/* Status badge */}
-      <div className="px-4 pb-3">
+      <div className="px-4 py-3 border-b-2 border-white/25 flex items-center justify-between">
+        <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+          Current Status
+        </span>
         <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BUTTON[status]}`}>
           {STATUS_LABELS[status]}
         </span>
       </div>
 
-      <div className="px-4 pb-4 space-y-3">
+      <div className="px-4 py-4 space-y-4">
         {/* Status buttons */}
         <div>
           <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
-            Status
+            Set Status
           </label>
           <div className="grid grid-cols-2 gap-2">
-            {STATUS_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setStatus(opt.value)}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all
-                  ${STATUS_BUTTON[opt.value]}
-                  ${status === opt.value ? STATUS_RING[opt.value] : ''}`}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {STATUS_OPTIONS.map((opt) => {
+              const isActive = status === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setStatus(opt.value)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border
+                    transition-all cursor-pointer
+                    ${isActive ? STATUS_CHIP[opt.value].active : STATUS_CHIP_INACTIVE}`}
+                >
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_CHIP[opt.value].dot}`} />
+                  {opt.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
         {/* Urgency toggle */}
-        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${isUrgent ? 'bg-red-500/15' : ''}`}>
+        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors
+          ${isUrgent ? 'bg-red-500/15 border-red-500/40' : 'border-white/10'}`}>
           <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
           </svg>
@@ -124,8 +150,8 @@ export default function UnitPopup({ unit, onClose, onSave }) {
         </div>
 
         {/* Notes */}
-        <div>
-          <label className="block text-xs text-slate-400 font-medium mb-1 uppercase tracking-wider">
+        <div className="pt-1 border-t-2 border-white/25">
+          <label className="block text-xs text-slate-400 font-medium mb-1.5 mt-3 uppercase tracking-wider">
             Notes
           </label>
           <textarea
@@ -143,7 +169,7 @@ export default function UnitPopup({ unit, onClose, onSave }) {
         <button
           onClick={handleSave}
           disabled={saving}
-          className={`w-full py-2 px-4 rounded-lg text-sm font-semibold transition-all
+          className={`w-full py-2 px-4 rounded-lg text-sm font-semibold transition-all cursor-pointer
             ${saved
               ? 'bg-green-600 text-white'
               : 'bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed'
