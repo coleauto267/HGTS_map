@@ -1,10 +1,22 @@
 import { useState, useMemo } from 'react'
 
 const STATUS_CONFIG = [
-  { value: 'needs_work', label: 'Needs Work', color: '#ef4444', dot: 'bg-red-500' },
-  { value: 'in_progress', label: 'In Progress', color: '#eab308', dot: 'bg-yellow-500' },
-  { value: 'completed', label: 'Completed', color: '#22c55e', dot: 'bg-green-500' },
-  { value: 'none', label: 'No Status', color: '#60a5fa', dot: 'bg-blue-400' },
+  {
+    value: 'needs_work', label: 'Needs Work', color: '#ef4444', dot: 'bg-red-500',
+    active: 'bg-red-500/15 border-red-500/60 ring-1 ring-red-500/30',
+  },
+  {
+    value: 'in_progress', label: 'In Progress', color: '#eab308', dot: 'bg-yellow-500',
+    active: 'bg-yellow-500/15 border-yellow-500/60 ring-1 ring-yellow-500/30',
+  },
+  {
+    value: 'completed', label: 'Completed', color: '#22c55e', dot: 'bg-green-500',
+    active: 'bg-green-500/15 border-green-500/60 ring-1 ring-green-500/30',
+  },
+  {
+    value: 'none', label: 'No Status', color: '#60a5fa', dot: 'bg-blue-400',
+    active: 'bg-blue-400/15 border-blue-400/60 ring-1 ring-blue-400/30',
+  },
 ]
 
 export default function StatsPanel({ units, activeFilter, onFilterChange, onSearch, loading }) {
@@ -81,44 +93,67 @@ export default function StatsPanel({ units, activeFilter, onFilterChange, onSear
           </div>
 
           {/* Legend / Stats */}
-          <div className="p-3 space-y-1">
+          <div className="p-3 space-y-1.5">
             <p className="text-slate-400 text-xs uppercase tracking-wider font-medium mb-2">
-              Units by Status
-              {activeFilter && (
-                <button
-                  onClick={() => onFilterChange(null)}
-                  className="ml-2 text-blue-400 hover:text-blue-300 normal-case tracking-normal font-normal"
-                >
-                  Clear filter
-                </button>
-              )}
+              Filter by Status
             </p>
 
             {loading ? (
               <p className="text-slate-500 text-xs py-2">Loading units…</p>
             ) : (
-              STATUS_CONFIG.map(({ value, label, dot }) => {
-                const isActive = activeFilter === value
-                const isFiltered = activeFilter !== null && !isActive
-                return (
-                  <button
-                    key={value}
-                    onClick={() => onFilterChange(isActive ? null : value)}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg
-                                text-sm transition-all text-left
-                                ${isActive ? 'bg-white/15 ring-1 ring-white/20' : 'hover:bg-white/10'}
-                                ${isFiltered ? 'opacity-40' : ''}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${dot}`} />
-                      <span className="text-slate-200 text-xs">{label}</span>
-                    </div>
-                    <span className="text-slate-400 text-xs font-mono font-medium">
-                      {counts[value]}
-                    </span>
-                  </button>
-                )
-              })
+              <>
+                <button
+                  onClick={() => onFilterChange(null)}
+                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg
+                              border text-sm transition-all text-left cursor-pointer
+                              ${activeFilter === null
+                                ? 'bg-white/15 border-white/40 ring-1 ring-white/20'
+                                : 'border-white/10 hover:border-white/25 hover:bg-white/5'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {activeFilter === null && (
+                      <svg className="w-3.5 h-3.5 text-white flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className="text-slate-200 text-xs font-medium">All Units</span>
+                  </div>
+                  <span className="text-slate-400 text-xs font-mono font-medium">
+                    {units.length}
+                  </span>
+                </button>
+
+                {STATUS_CONFIG.map(({ value, label, dot, active }) => {
+                  const isActive = activeFilter === value
+                  const isDimmed = activeFilter !== null && !isActive
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => onFilterChange(isActive ? null : value)}
+                      className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg
+                                  border text-sm transition-all text-left cursor-pointer
+                                  ${isActive
+                                    ? active
+                                    : 'border-white/10 hover:border-white/25 hover:bg-white/5'}
+                                  ${isDimmed ? 'opacity-40 hover:opacity-70' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isActive ? (
+                          <svg className="w-3.5 h-3.5 text-white flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${dot}`} />
+                        )}
+                        <span className="text-slate-200 text-xs">{label}</span>
+                      </div>
+                      <span className="text-slate-400 text-xs font-mono font-medium">
+                        {counts[value]}
+                      </span>
+                    </button>
+                  )
+                })}
+              </>
             )}
 
             {!loading && (
