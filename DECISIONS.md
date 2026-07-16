@@ -8,6 +8,36 @@ A maintenance-tracking map for the Warminster Heights (HGTS) HOA. It plots every
 
 **Stack:** React 19 + Vite, Mapbox GL JS (`mapbox-gl`), Supabase (Postgres) for mutable state, Tailwind CSS for UI.
 
+## Dependencies
+
+From `package.json`. Runtime dependencies:
+
+| Package | Version | Purpose |
+|---|---|---|
+| `react` / `react-dom` | ^19.2.6 | UI framework — component tree for the whole app. |
+| `mapbox-gl` | ^3.24.0 | The map itself — rendering, layers, zoom/pan, popups. Requires `VITE_MAPBOX_TOKEN`. |
+| `@supabase/supabase-js` | ^2.108.1 | Client for the `units` table (status/notes/is_urgent persistence). Requires `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`. |
+
+Dev/build dependencies:
+
+| Package | Version | Purpose |
+|---|---|---|
+| `vite` | ^8.0.12 | Dev server + build tool. |
+| `@vitejs/plugin-react` | ^6.0.1 | Vite's React plugin (JSX/Fast Refresh). |
+| `tailwindcss` | ^3.4.19 | Utility-first CSS, used throughout every component. |
+| `postcss` / `autoprefixer` | ^8.5.15 / ^10.5.0 | CSS pipeline Tailwind runs on. |
+| `eslint` | ^10.3.0 | Linting. |
+| `eslint-plugin-react-hooks` | ^7.1.1 | Enforces hooks rules (relevant given how much `MapView.jsx` leans on `useEffect`/refs). |
+| `eslint-plugin-react-refresh` | ^0.5.2 | Ensures components stay compatible with Fast Refresh. |
+| `@types/react` / `@types/react-dom` | ^19.2.14 / ^19.2.3 | Type defs for editor tooling (project itself is plain JS, not TS). |
+| `globals` | ^17.6.0 | Global variable definitions used by the ESLint config. |
+
+**External services (not npm packages, but required to run the app):**
+- **Mapbox** — needs an access token (`VITE_MAPBOX_TOKEN`) with a style/tiles budget; the app uses `mapbox://styles/mapbox/streets-v12` and `satellite-streets-v12`.
+- **Supabase project** — needs a `units` table (see `supabase_schema.sql`, and the schema-drift note below) plus a URL/anon key.
+
+No test runner, TypeScript, or state-management library is in use — state is plain React hooks (`useState`/`useEffect`/refs), no Redux/Zustand/etc.
+
 ## Architecture / data flow
 
 Two data sources are merged in `useUnits`:
