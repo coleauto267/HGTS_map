@@ -19,7 +19,9 @@ const STATUS_CONFIG = [
   },
 ]
 
-export default function StatsPanel({ units, activeFilter, onFilterChange, onSearch, loading }) {
+const LISTABLE_STATUSES = ['needs_work', 'in_progress', 'completed']
+
+export default function StatsPanel({ units, activeFilter, onFilterChange, onSearch, onAddressSelect, loading }) {
   const [searchValue, setSearchValue] = useState('')
   const [collapsed, setCollapsed] = useState(false)
 
@@ -30,6 +32,13 @@ export default function StatsPanel({ units, activeFilter, onFilterChange, onSear
     })
     return c
   }, [units])
+
+  const filteredUnits = useMemo(() => {
+    if (!LISTABLE_STATUSES.includes(activeFilter)) return []
+    return units
+      .filter((u) => u.status === activeFilter)
+      .sort((a, b) => a.full_address.localeCompare(b.full_address, undefined, { numeric: true }))
+  }, [units, activeFilter])
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -160,6 +169,28 @@ export default function StatsPanel({ units, activeFilter, onFilterChange, onSear
               <div className="pt-1 mt-1 border-t border-white/10 flex justify-between px-2.5 text-xs text-slate-500">
                 <span>Total</span>
                 <span className="font-mono">{units.length}</span>
+              </div>
+            )}
+
+            {!loading && LISTABLE_STATUSES.includes(activeFilter) && (
+              <div className="pt-2 mt-1 border-t border-white/10">
+                <p className="text-slate-400 text-xs uppercase tracking-wider font-medium mb-1.5 px-0.5">
+                  Addresses ({filteredUnits.length})
+                </p>
+                <ul className="address-list-scroll max-h-48 overflow-y-auto space-y-0.5">
+                  {filteredUnits.map((unit) => (
+                    <li key={unit.id ?? unit.full_address}>
+                      <button
+                        onClick={() => onAddressSelect(unit)}
+                        title={unit.full_address}
+                        className="w-full text-left text-slate-300 text-xs px-2.5 py-1 rounded-md
+                                   hover:bg-white/10 hover:text-white transition-colors truncate cursor-pointer"
+                      >
+                        {unit.full_address}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

@@ -38,6 +38,7 @@ export default function App() {
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
         onSearch={handleSearch}
+        onAddressSelect={setSearchTarget}
       />
 
       {/* Map style toggle */}
