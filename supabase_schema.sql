@@ -9,6 +9,11 @@ create table if not exists units (
   lon double precision,
   status text default 'none' check (status in ('none', 'needs_work', 'in_progress', 'completed')),
   notes text,
+  is_urgent boolean default false,
+  occupant text,
+  phone text,
+  email text,
+  universal_key boolean default false,
   created_at timestamp default now(),
   updated_at timestamp default now()
 );

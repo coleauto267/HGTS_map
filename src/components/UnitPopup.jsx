@@ -50,20 +50,38 @@ export default function UnitPopup({ unit, onClose, onSave }) {
   const [status, setStatus] = useState(unit.status)
   const [notes, setNotes] = useState(unit.notes || '')
   const [isUrgent, setIsUrgent] = useState(unit.is_urgent || false)
+  const [occupant, setOccupant] = useState(unit.occupant || '')
+  const [phone, setPhone] = useState(unit.phone || '')
+  const [email, setEmail] = useState(unit.email || '')
+  const [universalKey, setUniversalKey] = useState(unit.universal_key || false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
 
   useEffect(() => {
     setStatus(unit.status)
     setNotes(unit.notes || '')
     setIsUrgent(unit.is_urgent || false)
+    setOccupant(unit.occupant || '')
+    setPhone(unit.phone || '')
+    setEmail(unit.email || '')
+    setUniversalKey(unit.universal_key || false)
     setSaved(false)
+    setDetailsExpanded(false)
   }, [unit.id])
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await onSave(unit, { status, notes, is_urgent: isUrgent })
+      await onSave(unit, {
+        status,
+        notes,
+        is_urgent: isUrgent,
+        occupant,
+        phone,
+        email,
+        universal_key: universalKey,
+      })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
@@ -72,6 +90,9 @@ export default function UnitPopup({ unit, onClose, onSave }) {
       setSaving(false)
     }
   }
+
+  const fieldClass = 'w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 ' +
+    'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-600'
 
   return (
     <div className="w-72 rounded-xl overflow-hidden shadow-2xl"
@@ -159,11 +180,97 @@ export default function UnitPopup({ unit, onClose, onSave }) {
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
             placeholder="Add maintenance notes..."
-            className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                       resize-none placeholder-slate-600"
+            className={`${fieldClass} resize-none`}
           />
         </div>
+
+        {/* Expand/collapse toggle for occupant/contact/key details */}
+        <button
+          onClick={() => setDetailsExpanded((v) => !v)}
+          className="w-full flex items-center justify-center gap-1.5 py-1 text-slate-400 hover:text-white
+                     text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer"
+        >
+          {detailsExpanded ? 'Hide Details' : 'More Details'}
+          <svg
+            className={`w-3.5 h-3.5 transition-transform ${detailsExpanded ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {detailsExpanded && (
+          <>
+            {/* Occupant / contact info */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
+                  Occupant
+                </label>
+                <input
+                  type="text"
+                  value={occupant}
+                  onChange={(e) => setOccupant(e.target.value)}
+                  placeholder="Owner or tenant name"
+                  className={fieldClass}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
+                  Phone #
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="267-000-0000"
+                  className={fieldClass}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className={fieldClass}
+                />
+              </div>
+            </div>
+
+            {/* Universal Key */}
+            <div>
+              <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
+                Universal Key
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setUniversalKey(true)}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer
+                    ${universalKey
+                      ? 'bg-green-500/20 border-green-500/70 ring-1 ring-green-500/40 text-white'
+                      : STATUS_CHIP_INACTIVE}`}
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => setUniversalKey(false)}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer
+                    ${!universalKey
+                      ? 'bg-red-500/20 border-red-500/70 ring-1 ring-red-500/40 text-white'
+                      : STATUS_CHIP_INACTIVE}`}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Save button */}
         <button

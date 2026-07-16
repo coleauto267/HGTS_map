@@ -44,6 +44,10 @@ export function useUnits() {
           status: dbRow?.status || 'none',
           notes: dbRow?.notes || '',
           is_urgent: dbRow?.is_urgent || false,
+          occupant: dbRow?.occupant || '',
+          phone: dbRow?.phone || '',
+          email: dbRow?.email || '',
+          universal_key: dbRow?.universal_key || false,
         }
       })
 
@@ -100,6 +104,10 @@ export function useUnits() {
       status: dbRow.status,
       notes: dbRow.notes,
       is_urgent: dbRow.is_urgent,
+      occupant: dbRow.occupant,
+      phone: dbRow.phone,
+      email: dbRow.email,
+      universal_key: dbRow.universal_key,
     }
 
     setUnits((prev) => prev.map((u) => {
