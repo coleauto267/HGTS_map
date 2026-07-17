@@ -95,10 +95,10 @@ export default function UnitPopup({ unit, onClose, onSave }) {
     'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-600'
 
   return (
-    <div className="inline-block rounded-xl overflow-hidden shadow-2xl"
+    <div className="w-96 rounded-xl overflow-hidden shadow-2xl"
          style={{ background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)' }}>
       {/* Header spans the full width of the card */}
-      <div className="flex items-start justify-between p-4 pb-3 border-b-2 border-white/30">
+      <div className="flex items-start justify-between p-3 pb-2 border-b-2 border-white/30">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-white font-bold text-lg leading-tight truncate">
@@ -120,106 +120,80 @@ export default function UnitPopup({ unit, onClose, onSave }) {
         </button>
       </div>
 
-      {/* Body: columns laid out side by side, divided by vertical rules */}
-      <div className="flex items-stretch divide-x-2 divide-white/25">
-        {/* Column 1: status */}
-        <div className="w-56 shrink-0 p-4 space-y-4">
-          {/* Status buttons */}
-          <div>
-            <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
-              Set Status
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {STATUS_OPTIONS.map((opt) => {
-                const isActive = status === opt.value
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => setStatus(opt.value)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border
-                      transition-all cursor-pointer
-                      ${isActive ? STATUS_CHIP[opt.value].active : STATUS_CHIP_INACTIVE}`}
-                  >
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_CHIP[opt.value].dot}`} />
-                    {opt.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Urgency toggle */}
-          <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors
-            ${isUrgent ? 'bg-red-500/15 border-red-500/40' : 'border-white/10'}`}>
-            <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-            </svg>
-            <span className="text-white text-sm flex-1">Mark as Urgent</span>
-            <button
-              onClick={() => setIsUrgent((v) => !v)}
-              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isUrgent ? 'bg-red-500' : 'bg-slate-600'}`}
-              role="switch"
-              aria-checked={isUrgent}
-            >
-              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${isUrgent ? 'translate-x-4' : 'translate-x-0'}`} />
-            </button>
+      {/* Body: single column, stacked top to bottom */}
+      <div className="p-3 space-y-3">
+        {/* Status buttons: one row across the full width */}
+        <div>
+          <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
+            Set Status
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {STATUS_OPTIONS.map((opt) => {
+              const isActive = status === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setStatus(opt.value)}
+                  className={`flex flex-col items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-xs font-semibold border
+                    transition-all cursor-pointer text-center leading-tight
+                    ${isActive ? STATUS_CHIP[opt.value].active : STATUS_CHIP_INACTIVE}`}
+                >
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_CHIP[opt.value].dot}`} />
+                  {opt.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Column 2: notes, details toggle, save */}
-        <div className="w-72 shrink-0 p-4 flex flex-col space-y-4">
-          {/* Notes */}
-          <div className="flex-1 flex flex-col min-h-[6rem]">
-            <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
-              Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add maintenance notes..."
-              className={`${fieldClass} resize-none flex-1`}
-            />
-          </div>
-
-          {/* Expand/collapse toggle for occupant/contact/key details */}
+        {/* Urgency toggle */}
+        <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors
+          ${isUrgent ? 'bg-red-500/15 border-red-500/40' : 'border-white/10'}`}>
+          <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          <span className="text-white text-sm flex-1">Mark as Urgent</span>
           <button
-            onClick={() => setDetailsExpanded((v) => !v)}
-            className="w-full flex items-center justify-center gap-1.5 py-1 text-slate-400 hover:text-white
-                       text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer"
+            onClick={() => setIsUrgent((v) => !v)}
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isUrgent ? 'bg-red-500' : 'bg-slate-600'}`}
+            role="switch"
+            aria-checked={isUrgent}
           >
-            {detailsExpanded ? 'Hide Details' : 'More Details'}
-            <svg
-              className={`w-3.5 h-3.5 transition-transform ${detailsExpanded ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${isUrgent ? 'translate-x-4' : 'translate-x-0'}`} />
           </button>
-
-          {/* Save button */}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`w-full py-2 px-4 rounded-lg text-sm font-semibold transition-all cursor-pointer
-              ${saved
-                ? 'bg-green-600 text-white'
-                : 'bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed'
-              }`}
-          >
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Changes'}
-          </button>
-
-          {/* Parcel ID */}
-          {unit.parcel_id && (
-            <p className="text-slate-600 text-xs text-center">
-              Parcel: {unit.parcel_id}
-            </p>
-          )}
         </div>
 
-        {/* Column 3: occupant/contact/key details, shown when expanded */}
+        {/* Notes: compressed to a couple of rows now that everything stacks */}
+        <div>
+          <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
+            Notes
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            placeholder="Add maintenance notes..."
+            className={`${fieldClass} resize-none`}
+          />
+        </div>
+
+        {/* Expand/collapse toggle for occupant/contact/key details */}
+        <button
+          onClick={() => setDetailsExpanded((v) => !v)}
+          className="w-full flex items-center justify-center gap-1.5 py-1 text-slate-400 hover:text-white
+                     text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer"
+        >
+          {detailsExpanded ? 'Hide Details' : 'More Details'}
+          <svg
+            className={`w-3.5 h-3.5 transition-transform ${detailsExpanded ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
         {detailsExpanded && (
-          <div className="w-56 shrink-0 p-4 space-y-3">
+          <div className="space-y-3">
             <div>
               <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
                 Occupant
@@ -287,6 +261,19 @@ export default function UnitPopup({ unit, onClose, onSave }) {
             </div>
           </div>
         )}
+
+        {/* Save button: pinned as the last item, at the bottom of the card */}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className={`w-full py-2 px-4 rounded-lg text-sm font-semibold transition-all cursor-pointer
+            ${saved
+              ? 'bg-green-600 text-white'
+              : 'bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
+        >
+          {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Changes'}
+        </button>
       </div>
     </div>
   )
