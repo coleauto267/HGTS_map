@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { IconLayoutSidebar, IconLayoutSidebarRight } from '@tabler/icons-react'
 
 const STATUS_OPTIONS = [
   { value: 'none', label: 'No Status' },
@@ -56,7 +57,7 @@ export default function UnitPopup({ unit, onClose, onSave }) {
   const [universalKey, setUniversalKey] = useState(unit.universal_key || false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const [activeView, setActiveView] = useState('status')
 
   useEffect(() => {
     setStatus(unit.status)
@@ -67,7 +68,7 @@ export default function UnitPopup({ unit, onClose, onSave }) {
     setEmail(unit.email || '')
     setUniversalKey(unit.universal_key || false)
     setSaved(false)
-    setDetailsExpanded(false)
+    setActiveView('status')
   }, [unit.id])
 
   const handleSave = async () => {
@@ -109,90 +110,90 @@ export default function UnitPopup({ unit, onClose, onSave }) {
             </span>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="ml-2 mt-0.5 text-slate-500 hover:text-white transition-colors flex-shrink-0 cursor-pointer"
-          aria-label="Close"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Body: single column, stacked top to bottom */}
-      <div className="p-3 space-y-3">
-        {/* Status buttons: one row across the full width */}
-        <div>
-          <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
-            Set Status
-          </label>
-          <div className="grid grid-cols-4 gap-2">
-            {STATUS_OPTIONS.map((opt) => {
-              const isActive = status === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => setStatus(opt.value)}
-                  className={`flex flex-col items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-xs font-semibold border
-                    transition-all cursor-pointer text-center leading-tight
-                    ${isActive ? STATUS_CHIP[opt.value].active : STATUS_CHIP_INACTIVE}`}
-                >
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_CHIP[opt.value].dot}`} />
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Urgency toggle */}
-        <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors
-          ${isUrgent ? 'bg-red-500/15 border-red-500/40' : 'border-white/10'}`}>
-          <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-          </svg>
-          <span className="text-white text-sm flex-1">Mark as Urgent</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={() => setIsUrgent((v) => !v)}
-            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isUrgent ? 'bg-red-500' : 'bg-slate-600'}`}
-            role="switch"
-            aria-checked={isUrgent}
+            onClick={() => setActiveView((v) => (v === 'status' ? 'details' : 'status'))}
+            className="mt-0.5 text-slate-500 hover:text-white transition-colors cursor-pointer"
+            aria-label="Switch view"
           >
-            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${isUrgent ? 'translate-x-4' : 'translate-x-0'}`} />
+            {activeView === 'status'
+              ? <IconLayoutSidebarRight className="w-5 h-5" stroke={2} />
+              : <IconLayoutSidebar className="w-5 h-5" stroke={2} />}
+          </button>
+          <button
+            onClick={onClose}
+            className="mt-0.5 text-slate-500 hover:text-white transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
+      </div>
 
-        {/* Notes: compressed to a couple of rows now that everything stacks */}
-        <div>
-          <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
-            Notes
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            placeholder="Add maintenance notes..."
-            className={`${fieldClass} resize-none`}
-          />
-        </div>
+      {/* Body: single column, stacked top to bottom. Fixed min-height so toggling views never resizes the card. */}
+      <div className="p-3 space-y-3 min-h-[22rem]">
+        {activeView === 'status' && (
+          <>
+            {/* Status buttons: one row across the full width */}
+            <div>
+              <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
+                Set Status
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {STATUS_OPTIONS.map((opt) => {
+                  const isActive = status === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setStatus(opt.value)}
+                      className={`flex flex-col items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-xs font-semibold border
+                        transition-all cursor-pointer text-center leading-tight
+                        ${isActive ? STATUS_CHIP[opt.value].active : STATUS_CHIP_INACTIVE}`}
+                    >
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_CHIP[opt.value].dot}`} />
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
-        {/* Expand/collapse toggle for occupant/contact/key details */}
-        <button
-          onClick={() => setDetailsExpanded((v) => !v)}
-          className="w-full flex items-center justify-center gap-1.5 py-1 text-slate-400 hover:text-white
-                     text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer"
-        >
-          {detailsExpanded ? 'Hide Details' : 'More Details'}
-          <svg
-            className={`w-3.5 h-3.5 transition-transform ${detailsExpanded ? 'rotate-180' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+            {/* Urgency toggle */}
+            <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors
+              ${isUrgent ? 'bg-red-500/15 border-red-500/40' : 'border-white/10'}`}>
+              <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              <span className="text-white text-sm flex-1">Mark as Urgent</span>
+              <button
+                onClick={() => setIsUrgent((v) => !v)}
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isUrgent ? 'bg-red-500' : 'bg-slate-600'}`}
+                role="switch"
+                aria-checked={isUrgent}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${isUrgent ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+            </div>
 
-        {detailsExpanded && (
+            {/* Notes: compressed to a couple of rows now that everything stacks */}
+            <div>
+              <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                placeholder="Add maintenance notes..."
+                className={`${fieldClass} resize-none`}
+              />
+            </div>
+          </>
+        )}
+
+        {activeView === 'details' && (
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
