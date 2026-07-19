@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { IconLayoutSidebar, IconLayoutSidebarRight } from '@tabler/icons-react'
+import { IconLayoutSidebar, IconLayoutSidebarRight, IconKey } from '@tabler/icons-react'
 
 const STATUS_OPTIONS = [
   { value: 'none', label: 'No Status' },
@@ -133,9 +133,18 @@ export default function UnitPopup({ unit, onClose, onSave }) {
       </div>
 
       {/* Body: single column, stacked top to bottom. Fixed min-height so toggling views never resizes the card. */}
-      <div className="p-3 space-y-3 min-h-[22rem]">
+      <div className="p-3 space-y-3 min-h-[19rem]">
         {activeView === 'status' && (
-          <>
+          <div className="relative space-y-3">
+            {/* Universal Key: icon-only toggle, red = no key, green = has key */}
+            <button
+              onClick={() => setUniversalKey((v) => !v)}
+              className={`absolute top-0 right-0 transition-colors cursor-pointer ${universalKey ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`}
+              aria-label={universalKey ? 'Universal key: yes' : 'Universal key: no'}
+            >
+              <IconKey className="w-5 h-5" stroke={2} />
+            </button>
+
             {/* Status buttons: one row across the full width */}
             <div>
               <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
@@ -190,7 +199,7 @@ export default function UnitPopup({ unit, onClose, onSave }) {
                 className={`${fieldClass} resize-none`}
               />
             </div>
-          </>
+          </div>
         )}
 
         {activeView === 'details' && (
@@ -232,33 +241,6 @@ export default function UnitPopup({ unit, onClose, onSave }) {
                 placeholder="name@example.com"
                 className={fieldClass}
               />
-            </div>
-
-            {/* Universal Key */}
-            <div>
-              <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
-                Universal Key
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setUniversalKey(true)}
-                  className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer
-                    ${universalKey
-                      ? 'bg-green-500/20 border-green-500/70 ring-1 ring-green-500/40 text-white'
-                      : STATUS_CHIP_INACTIVE}`}
-                >
-                  Yes
-                </button>
-                <button
-                  onClick={() => setUniversalKey(false)}
-                  className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer
-                    ${!universalKey
-                      ? 'bg-red-500/20 border-red-500/70 ring-1 ring-red-500/40 text-white'
-                      : STATUS_CHIP_INACTIVE}`}
-                >
-                  No
-                </button>
-              </div>
             </div>
           </div>
         )}
