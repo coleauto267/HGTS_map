@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { IconLayoutSidebar, IconLayoutSidebarRight, IconKey } from '@tabler/icons-react'
 
 const STATUS_OPTIONS = [
@@ -8,7 +8,16 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completed' },
 ]
 
-// Solid pill used for the read-only "current status" badge
+const JOB_TITLE_OPTIONS = ['Bathroom', 'Kitchen', 'Floor', 'Full Rehab']
+
+const URGENCY_OPTIONS = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'emergency', label: 'Emergency' },
+]
+
+// Header status dropdown: solid pill colored per status, doubles as the "current status" badge
 const STATUS_BUTTON = {
   none:        'bg-blue-400 hover:bg-blue-300 text-white',
   needs_work:  'bg-red-500 hover:bg-red-400 text-white',
@@ -16,60 +25,57 @@ const STATUS_BUTTON = {
   completed:   'bg-green-500 hover:bg-green-400 text-white',
 }
 
-// Interactive status buttons: muted/outlined when unselected, colored + ring when selected
-// (mirrors the filter-chip pattern in StatsPanel so selection state is unambiguous)
-const STATUS_CHIP = {
-  none: {
-    dot: 'bg-blue-400',
-    active: 'bg-blue-400/20 border-blue-400/70 ring-1 ring-blue-400/40 text-white',
-  },
-  needs_work: {
-    dot: 'bg-red-500',
-    active: 'bg-red-500/20 border-red-500/70 ring-1 ring-red-500/40 text-white',
-  },
-  in_progress: {
-    dot: 'bg-yellow-500',
-    active: 'bg-yellow-500/20 border-yellow-500/70 ring-1 ring-yellow-500/40 text-white',
-  },
-  completed: {
-    dot: 'bg-green-500',
-    active: 'bg-green-500/20 border-green-500/70 ring-1 ring-green-500/40 text-white',
-  },
-}
-
-const STATUS_CHIP_INACTIVE =
-  'bg-slate-800/70 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'
-
-const STATUS_LABELS = {
-  none: 'No Status',
-  needs_work: 'Needs Work',
-  in_progress: 'In Progress',
-  completed: 'Completed',
+// Urgency dropdown: colored dot per severity level
+const URGENCY_DOT = {
+  low:       'bg-slate-400',
+  medium:    'bg-yellow-500',
+  urgent:    'bg-orange-500',
+  emergency: 'bg-red-500',
 }
 
 export default function UnitPopup({ unit, onClose, onSave }) {
   const [status, setStatus] = useState(unit.status)
   const [notes, setNotes] = useState(unit.notes || '')
-  const [isUrgent, setIsUrgent] = useState(unit.is_urgent || false)
+  const [urgency, setUrgency] = useState(unit.urgency || 'low')
   const [occupant, setOccupant] = useState(unit.occupant || '')
   const [phone, setPhone] = useState(unit.phone || '')
   const [email, setEmail] = useState(unit.email || '')
   const [universalKey, setUniversalKey] = useState(unit.universal_key || false)
+  const [jobTitles, setJobTitles] = useState(unit.job_title || [])
+  const [jobTitleMenuOpen, setJobTitleMenuOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [activeView, setActiveView] = useState('status')
+  const jobTitleRef = useRef(null)
 
   useEffect(() => {
     setStatus(unit.status)
     setNotes(unit.notes || '')
-    setIsUrgent(unit.is_urgent || false)
+    setUrgency(unit.urgency || 'low')
     setOccupant(unit.occupant || '')
     setPhone(unit.phone || '')
     setEmail(unit.email || '')
     setUniversalKey(unit.universal_key || false)
+    setJobTitles(unit.job_title || [])
+    setJobTitleMenuOpen(false)
     setSaved(false)
     setActiveView('status')
   }, [unit.id])
+
+  useEffect(() => {
+    if (!jobTitleMenuOpen) return
+    const handleClickOutside = (e) => {
+      if (jobTitleRef.current && !jobTitleRef.current.contains(e.target)) {
+        setJobTitleMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [jobTitleMenuOpen])
+
+  const toggleJobTitle = (title) => {
+    setJobTitles((prev) => prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title])
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -77,11 +83,12 @@ export default function UnitPopup({ unit, onClose, onSave }) {
       await onSave(unit, {
         status,
         notes,
-        is_urgent: isUrgent,
+        urgency,
         occupant,
         phone,
         email,
         universal_key: universalKey,
+        job_title: jobTitles,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -96,7 +103,7 @@ export default function UnitPopup({ unit, onClose, onSave }) {
     'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-600'
 
   return (
-    <div className="w-96 rounded-xl overflow-hidden shadow-2xl"
+    <div className="w-96 rounded-xl shadow-2xl"
          style={{ background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)' }}>
       {/* Header spans the full width of the card */}
       <div className="flex items-start justify-between p-3 pb-2 border-b-2 border-white/30">
@@ -105,12 +112,35 @@ export default function UnitPopup({ unit, onClose, onSave }) {
             <h3 className="text-white font-bold text-lg leading-tight truncate">
               {unit.full_address}
             </h3>
-            <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${STATUS_BUTTON[status]}`}>
-              {STATUS_LABELS[status]}
-            </span>
+            <div className="relative inline-flex flex-shrink-0">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className={`appearance-none pl-2.5 pr-5 py-0.5 rounded-full text-xs font-semibold cursor-pointer border-0
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 ${STATUS_BUTTON[status]}`}
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value} className="bg-slate-800 text-white">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <svg className={`pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 ${status === 'in_progress' ? 'text-black' : 'text-white'}`}
+                   fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Universal Key: icon-only toggle, red = no key, green = has key */}
+          <button
+            onClick={() => setUniversalKey((v) => !v)}
+            className={`mt-0.5 transition-colors cursor-pointer ${universalKey ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`}
+            aria-label={universalKey ? 'Universal key: yes' : 'Universal key: no'}
+          >
+            <IconKey className="w-5 h-5" stroke={2} />
+          </button>
           <button
             onClick={() => setActiveView((v) => (v === 'status' ? 'details' : 'status'))}
             className="mt-0.5 text-slate-500 hover:text-white transition-colors cursor-pointer"
@@ -133,57 +163,79 @@ export default function UnitPopup({ unit, onClose, onSave }) {
       </div>
 
       {/* Body: single column, stacked top to bottom. Fixed min-height so toggling views never resizes the card. */}
-      <div className="p-3 space-y-3 min-h-[19rem]">
+      <div className="p-3 space-y-3 min-h-[17.5rem]">
         {activeView === 'status' && (
-          <div className="relative space-y-3">
-            {/* Universal Key: icon-only toggle, red = no key, green = has key */}
-            <button
-              onClick={() => setUniversalKey((v) => !v)}
-              className={`absolute top-0 right-0 transition-colors cursor-pointer ${universalKey ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`}
-              aria-label={universalKey ? 'Universal key: yes' : 'Universal key: no'}
-            >
-              <IconKey className="w-5 h-5" stroke={2} />
-            </button>
-
-            {/* Status buttons: one row across the full width */}
-            <div>
-              <label className="block text-xs text-slate-400 font-medium mb-2 uppercase tracking-wider">
-                Set Status
+          <div className="space-y-3">
+            {/* Job Title: multi-select dropdown, second most important field after the address */}
+            <div ref={jobTitleRef} className="relative">
+              <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
+                Job Title
               </label>
-              <div className="grid grid-cols-4 gap-2">
-                {STATUS_OPTIONS.map((opt) => {
-                  const isActive = status === opt.value
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => setStatus(opt.value)}
-                      className={`flex flex-col items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-xs font-semibold border
-                        transition-all cursor-pointer text-center leading-tight
-                        ${isActive ? STATUS_CHIP[opt.value].active : STATUS_CHIP_INACTIVE}`}
-                    >
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_CHIP[opt.value].dot}`} />
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
+              <button
+                type="button"
+                onClick={() => setJobTitleMenuOpen((v) => !v)}
+                className={`${fieldClass} flex items-center justify-between gap-2 text-left cursor-pointer`}
+              >
+                <span className={`truncate ${jobTitles.length ? 'text-white' : 'text-slate-600'}`}>
+                  {jobTitles.length ? jobTitles.join(', ') : 'Select job title...'}
+                </span>
+                <svg className={`w-4 h-4 flex-shrink-0 text-slate-400 transition-transform ${jobTitleMenuOpen ? 'rotate-180' : ''}`}
+                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {jobTitleMenuOpen && (
+                <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-slate-700 bg-slate-800 shadow-lg overflow-hidden">
+                  {JOB_TITLE_OPTIONS.map((title) => {
+                    const checked = jobTitles.includes(title)
+                    return (
+                      <button
+                        key={title}
+                        type="button"
+                        onClick={() => toggleJobTitle(title)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left cursor-pointer hover:bg-slate-700"
+                      >
+                        <span className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center transition-colors
+                          ${checked ? 'bg-blue-600 border-blue-600' : 'border-slate-600'}`}>
+                          {checked && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className={checked ? 'text-white' : 'text-slate-300'}>{title}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Urgency toggle */}
-            <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors
-              ${isUrgent ? 'bg-red-500/15 border-red-500/40' : 'border-white/10'}`}>
-              <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-              </svg>
-              <span className="text-white text-sm flex-1">Mark as Urgent</span>
-              <button
-                onClick={() => setIsUrgent((v) => !v)}
-                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isUrgent ? 'bg-red-500' : 'bg-slate-600'}`}
-                role="switch"
-                aria-checked={isUrgent}
-              >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${isUrgent ? 'translate-x-4' : 'translate-x-0'}`} />
-              </button>
+            {/* Urgency: single-select dropdown */}
+            <div>
+              <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
+                Urgency
+              </label>
+              <div className="relative">
+                <span className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${URGENCY_DOT[urgency]}`} />
+                <select
+                  value={urgency}
+                  onChange={(e) => setUrgency(e.target.value)}
+                  className="w-full appearance-none bg-slate-800 border border-slate-700 text-white text-sm rounded-lg pl-7 pr-8 py-2
+                    cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {URGENCY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value} className="bg-slate-800 text-white">
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
 
             {/* Notes: compressed to a couple of rows now that everything stacks */}

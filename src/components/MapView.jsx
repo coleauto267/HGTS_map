@@ -37,7 +37,7 @@ function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
     id: URGENT_RING_LAYER_ID,
     type: 'circle',
     source: SOURCE_ID,
-    filter: ['==', ['get', 'is_urgent'], true],
+    filter: ['in', ['get', 'urgency'], ['literal', ['urgent', 'emergency']]],
     paint: {
       'circle-color': 'rgba(0,0,0,0)',
       'circle-stroke-color': '#ffffff',
@@ -156,7 +156,7 @@ function unitsToGeoJSON(units) {
           parcel_id: u.parcel_id || '',
           status: u.status,
           notes: u.notes || '',
-          is_urgent: u.is_urgent || false,
+          urgency: u.urgency || 'low',
           addr_num: u.full_address?.split(' ')[0] || '',
         },
       })),
@@ -236,9 +236,10 @@ export default function MapView({
     const filter = activeFilter ? ['==', ['get', 'status'], activeFilter] : null
     map.setFilter(LAYER_ID, filter)
     map.setFilter(LABEL_LAYER_ID, filter)
+    const isUrgentExpr = ['in', ['get', 'urgency'], ['literal', ['urgent', 'emergency']]]
     const urgentFilter = activeFilter
-      ? ['all', ['==', ['get', 'is_urgent'], true], ['==', ['get', 'status'], activeFilter]]
-      : ['==', ['get', 'is_urgent'], true]
+      ? ['all', isUrgentExpr, ['==', ['get', 'status'], activeFilter]]
+      : isUrgentExpr
     map.setFilter(URGENT_RING_LAYER_ID, urgentFilter)
   }, [activeFilter])
 

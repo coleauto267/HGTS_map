@@ -43,11 +43,12 @@ export function useUnits() {
           lon: f.properties.Long ?? f.geometry?.coordinates?.[0] ?? null,
           status: dbRow?.status || 'none',
           notes: dbRow?.notes || '',
-          is_urgent: dbRow?.is_urgent || false,
+          urgency: dbRow?.urgency || 'low',
           occupant: dbRow?.occupant || '',
           phone: dbRow?.phone || '',
           email: dbRow?.email || '',
           universal_key: dbRow?.universal_key || false,
+          job_title: dbRow?.job_title || [],
         }
       })
 
@@ -103,11 +104,12 @@ export function useUnits() {
       id: dbRow.id,
       status: dbRow.status,
       notes: dbRow.notes,
-      is_urgent: dbRow.is_urgent,
+      urgency: dbRow.urgency,
       occupant: dbRow.occupant,
       phone: dbRow.phone,
       email: dbRow.email,
       universal_key: dbRow.universal_key,
+      job_title: dbRow.job_title,
     }
 
     setUnits((prev) => prev.map((u) => {

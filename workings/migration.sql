@@ -1,20 +1,9 @@
--- Run this in the Supabase SQL editor to create the units and projects tables.
--- For an EXISTING project migrating from the old single-table design,
--- use workings/migration.sql instead — this file is for a fresh install.
+-- Run this ONCE in the Supabase SQL editor to migrate the LIVE units table
+-- to the new units + projects design. This drops columns — status/notes/
+-- urgency/job_title data on existing rows is deleted permanently (confirmed
+-- OK to lose, it was placeholder data).
 
-create table if not exists units (
-  id uuid primary key default gen_random_uuid(),
-  full_address text not null,
-  street_name text,
-  lat double precision,
-  lon double precision,
-  occupant text,
-  phone text,
-  email text,
-  universal_key boolean default false,
-  updated_at timestamp default now()
-);
-
+-- 1. Create the new projects table
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
   unit_id uuid references units(id) on delete cascade,
@@ -27,21 +16,21 @@ create table if not exists projects (
   updated_at timestamp default now()
 );
 
--- Indexes for fast filtering/reporting
 create index if not exists idx_projects_unit_id on projects(unit_id);
 create index if not exists idx_projects_category on projects(category);
 create index if not exists idx_projects_status on projects(status);
 
--- Enable row-level security (RLS) — adjust policies to suit your auth requirements
-alter table units enable row level security;
 alter table projects enable row level security;
-
--- Policies: open to anyone with the anon key (matches the rest of the app)
-create policy "Allow read for all" on units for select using (true);
-create policy "Allow update for all" on units for update using (true);
-create policy "Allow insert for all" on units for insert with check (true);
-
 create policy "Allow read for all" on projects for select using (true);
 create policy "Allow update for all" on projects for update using (true);
 create policy "Allow insert for all" on projects for insert with check (true);
 create policy "Allow delete for all" on projects for delete using (true);
+
+-- 2. Drop the columns that moved to projects (or are unused), from units
+alter table units drop column if exists parcel_id;
+alter table units drop column if exists is_urgent;
+alter table units drop column if exists created_at;
+alter table units drop column if exists status;
+alter table units drop column if exists notes;
+alter table units drop column if exists urgency;
+alter table units drop column if exists job_title;
