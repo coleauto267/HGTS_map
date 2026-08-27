@@ -18,7 +18,7 @@ create table if not exists units (
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
   unit_id uuid references units(id) on delete cascade,
-  category text check (category in ('bathroom', 'kitchen', 'tub', 'cabinet', 'waterline', 'floor', 'beam')),
+  job text check (job in ('bathroom', 'kitchen', 'tub', 'cabinet', 'waterline', 'floor', 'beam')),
   status text default 'needs_work' check (status in ('needs_work', 'in_progress', 'completed')),
   priority text default 'low' check (priority in ('low', 'medium', 'urgent', 'emergency')),
   date_added date,
@@ -29,7 +29,7 @@ create table if not exists projects (
 
 -- Indexes for fast filtering/reporting
 create index if not exists idx_projects_unit_id on projects(unit_id);
-create index if not exists idx_projects_category on projects(category);
+create index if not exists idx_projects_job on projects(job);
 create index if not exists idx_projects_status on projects(status);
 
 -- Enable row-level security (RLS) — adjust policies to suit your auth requirements
