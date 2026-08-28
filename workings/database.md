@@ -29,6 +29,12 @@ A property with 3 issues = 3 rows in `projects`, not 3 columns crammed into 1 ro
 
 This is called a **foreign key**. `unit_id` is the pointer; `units.id` is what it points at.
 
+### Foreign key vs. primary key — the terms
+- **Primary key** — what a value points *at*. Each table's own unique ID column (`units.id`, `projects.id`).
+- **Foreign key** — the pointer column itself, sitting in the *other* table, holding a copy of a primary key value (`projects.unit_id`).
+
+Writing `references units(id)` in the column definition isn't just documentation — Postgres actually **enforces** it. It won't let you insert a `projects` row with a `unit_id` that doesn't match a real `units.id`. That prevents "orphan" rows pointing at nothing.
+
 ## Why `id` exists when `full_address` looks unique enough
 `id` is for the computer — permanent, meaningless to a person, guaranteed unique by the database itself. `full_address` is for the human — readable, but just text, and not database-enforced as unique.
 
@@ -50,6 +56,18 @@ where units.full_address = '1 Adams St';
 `join ... on` matches rows by ID, for every unit in the database. `where` is what narrows it down to one property. Remove the `where` and you'd get every project for every unit at once.
 
 **Relationship shape:** one-to-many. One `units` row can have many `projects` rows. `units` is the parent, `projects` are the children.
+
+## One-to-many vs. many-to-many
+
+Two different shapes of relationship between tables — which one you have determines whether a simple foreign key is enough, or whether you need a junction table.
+
+**One-to-many** — one row on one side can relate to many rows on the other, but each of those rows only relates back to *one* parent. Needs just **one foreign key**.
+- Example: `units → projects`. One unit has many projects. Each project belongs to exactly one unit (`unit_id`).
+
+**Many-to-many** — rows on *both* sides can relate to many rows on the other side. One foreign key can't express this — you need a **junction table** in between, with a foreign key pointing each direction.
+- Example (planned, not built): `projects → materials`. One project can use many materials, *and* the same material (e.g. "grout") gets reused across many different projects. The `project_materials` junction table is what makes this work — see the materials open item above.
+
+**Quick test:** if you're asking "could this ONE thing on the other side apply to MANY things over here too?" — if yes, it's many-to-many and needs a junction table. If the "many" side only ever points back to one parent, it's one-to-many and a plain foreign key is enough.
 
 ## `created_at`/`updated_at` vs `date_added`/`date_completed`
 Two different jobs:
@@ -90,3 +108,18 @@ Shape, if built:
 - **`project_materials`** — the junction table. One row per (project, material) pairing — e.g. `project_id`, `material_id`, `quantity`. This is what actually assigns a material to a specific job.
 
 **Status: not built, not requested yet.** `notes` on `projects` covers "what materials were used" fine until there's a real, confirmed need for material-level reporting. Documented here so the shape is ready if that need comes up.
+
+## Restricting column options: `check` constraint vs. lookup table
+
+Two different ways to build "only allow certain values" — which to use depends on how big and how often the list changes.
+
+| | `check` constraint | Lookup table |
+|---|---|---|
+| Where the list lives | Hardcoded directly in the column definition | Rows in a separate table |
+| Best for | Small, stable lists (roughly under 10, rarely changes) | Large or growing lists (dozens to hundreds+) |
+| Adding a new option | Requires a schema change (`alter table`) | Just insert a new row — no schema change |
+| Extra info per option? | No — just the value itself | Yes — can attach other columns (price, supplier, unit, etc.) |
+| Extra tables needed | None | One (plus a junction table if it's many-to-many, like materials) |
+| Used in this project for | `job`, `status`, `priority` | `materials` (planned, not built) |
+
+**Rule of thumb:** small and stable → `check` constraint. Large and/or growing → lookup table.
