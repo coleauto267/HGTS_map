@@ -62,6 +62,32 @@ The merge happens client-side on load: every GeoJSON feature is matched to a Sup
 - **`is_urgent` (boolean) is deprecated in favor of `urgency` (text, 4 levels)** — the app no longer reads or writes `is_urgent` anywhere; it was replaced end-to-end (`UnitPopup.jsx`, `useUnits.js`, `MapView.jsx`) by a `urgency` column (`'low' | 'medium' | 'urgent' | 'emergency'`, default `'low'`). The old column was **left in place in `supabase_schema.sql`** rather than dropped, since dropping a column on a live table is destructive and unnecessary just to stop using it. Same for `job_title text[]` (new, holds a multi-select of job categories) — both are additive columns following the same `CREATE TABLE IF NOT EXISTS` gotcha above: **an existing Supabase environment needs `ALTER TABLE units ADD COLUMN IF NOT EXISTS urgency text default 'low' check (urgency in ('low','medium','urgent','emergency'));` and `ALTER TABLE units ADD COLUMN IF NOT EXISTS job_title text[] default '{}';`** run manually before saves using either field will work. **(Superseded — see below.)**
 - **Superseded the single-`units`-table design entirely with a `units` + `projects` split**, in response to client-requested granularity (see Known gaps for the original request). `status`, `notes`, `urgency`, and `job_title` were removed from `units` and now live as columns on a new `projects` table instead — a unit can have many `projects` rows (one per category of work: bathroom, kitchen, tub, cabinet, waterline, floor, beam), each with its own `status`, `priority`, `date_added`, `date_completed`, and `notes`. `parcel_id`, `is_urgent`, and `created_at` were dropped from `units` entirely (parcel_id/is_urgent were unused; created_at was low-value since units are only inserted lazily on first save, not at "creation"). `units` keeps `updated_at`; `projects` keeps `updated_at` only (no `created_at` — decided redundant with the more meaningful `date_added`). **`updated_at` is set by app code (JS) on every save, not a Postgres trigger** — deliberately kept simple/readable over "more correct." Full design walkthrough (why two tables, what each column is for, id vs. foreign key, etc.) is in `workings/languages.md` and the planning conversation that produced `workings/migration.sql`. **This was applied directly against the live database** (`workings/migration.sql`, run manually in the Supabase SQL editor — placeholder status data was intentionally discarded, not migrated) **before the application code was updated to match** — `useUnits.js`/`UnitPopup.jsx`/`MapView.jsx` still reference the old single-table shape as of this commit and the app does not currently run. This was a deliberate sequencing choice (database first, UI second) since the app has no live users yet.
 
+### Status/priority/color design for `units` + `projects` (verbatim from Cole, 2026-08-27)
+
+Recorded word-for-word as written, superseding earlier speculation in this file about how unit color/halo would be computed from projects (that speculation assumed unit status would be *derived* from project status — it is not; see below). Nothing described here has been implemented yet — decisions and open items only.
+
+> Status:
+>
+> unit(dot) color will be determined by the units overall status. This is set manual by the user and not influenced by any given task's status. Units will have the same 3 statuses and colors they have now.
+>
+> task (once "job") status will exist independent and only be visible when a user clicks deeper into the unit. a task's status is binary. Either open or done(closed). I want it to be visually "crossed out" in the UI, like a real-life punch list. When crossing off a task, that task will be done/completed AKA "part of the units history"
+>
+> Open item:
+>
+> We may connect the 2 tables' Status for automatic and accurate unit colors
+> ex. no tasks left = dot automatically turns green
+>
+> Priority:
+>
+> Priority (in projects) will be 3 options. (small, medium and urgent) They will be represented as "outer rings" of the dots (like the old binary "urgent" worked). Their colors will be
+>
+> - No ring - low priority)
+> - white ring- medium priority
+> - yellow ring - urgent
+>
+> Open Item:
+> We may add a boolean column called "Emergency" either off or on. I will override any priority. Maybe there will be an "!" on top of the unit dot, lets plan for that. Do not add the "emergency" column. Just take note of it.
+
 ### Map behavior (MapView.jsx)
 - **Bounding box locks the map to the HOA + immediate surrounding roads** (`MAX_BOUNDS`), so users can't pan away into the rest of Pennsylvania.
 - **`minZoom: 15`, `maxZoom: 19`** — zoomed out caps at roughly a 100m view of the neighborhood; there's no reason to zoom out further for this use case, and zooming in past 19 doesn't add useful detail on top of Mapbox's street tiles.
@@ -127,7 +153,7 @@ The merge happens client-side on load: every GeoJSON feature is matched to a Sup
 - **`full_address` has no unique constraint in Supabase** — see the orphan-duplicate note under Data layer decisions. Not causing visible problems today, but a cleanup/constraint pass would prevent it recurring.
 - ~~Live Supabase environments need two manual `ALTER TABLE`s before urgency/job_title saves work~~ — **resolved, moot**: `urgency`/`job_title` no longer live on `units` at all, see the `units` + `projects` split above.
 - ~~Client requested a bigger "projects" feature; architecture decision pending~~ — **decision made, schema built**: the client email (relayed 2026-07-24) asking for per-category subcategories, priority levels, dated line-items, and cross-unit reporting/filtering (full detail preserved in git history — see the Data layer note above for the resolution) drove the `units`/`projects` split. The open item now is narrower — see below.
-- **The application code has not been updated for the new `units`/`projects` schema — the app does not currently run.** `useUnits.js`, `UnitPopup.jsx`, and `MapView.jsx` still read/write `status`, `notes`, `urgency`, `job_title`, and `parcel_id` directly on `units`, all of which were dropped from the live table by `workings/migration.sql`. **This is the next task**: rewrite the data layer to fetch/join `projects` per unit, and redesign `UnitPopup.jsx` around a list of per-unit projects instead of flat unit-level fields. Decided in planning: multiple simultaneous projects per unit should display as a **collapsible accordion** (one section per project, collapsed by default) rather than tabs or all-expanded. Also decided: no rolled-up "one status" badge is stored on `units` — if an at-a-glance summary is wanted on the map/popup later, compute it live from that unit's `projects` (e.g. highest priority + worst status among non-completed rows) rather than storing a second copy of the truth that can drift.
+- **The application code has not been updated for the new `units`/`projects` schema — the app does not currently run.** `useUnits.js`, `UnitPopup.jsx`, and `MapView.jsx` still read/write `status`, `notes`, `urgency`, `job_title`, and `parcel_id` directly on `units`, all of which were dropped from the live table by `workings/migration.sql`. **This is the next task**: rewrite the data layer to fetch/join `projects` per unit, and redesign `UnitPopup.jsx` around a list of per-unit projects instead of flat unit-level fields. Decided in planning: multiple simultaneous projects per unit should display as a **collapsible accordion** (one section per project, collapsed by default) rather than tabs or all-expanded. Also decided: no rolled-up "one status" badge is stored on `units` — if an at-a-glance summary is wanted on the map/popup later, compute it live from that unit's `projects` rather than storing a second copy of the truth that can drift.
 - **Cross-unit filtering/reporting by category (client asks 4 and 7) is not yet designed** — e.g. "show all units needing beams" or "count bathrooms completed Feb–Mar 2026." The `projects` table (indexed on `category` and `status`) supports these queries, but no UI exists for them yet. Sequence after `UnitPopup.jsx` is rebuilt against `projects`.
 
 ## Build history (chronological)
