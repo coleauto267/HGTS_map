@@ -4,7 +4,7 @@
 
 create table if not exists units (
   id uuid primary key default gen_random_uuid(),
-  full_address text not null,
+  full_address text not null unique,
   street_name text,
   lat double precision,
   lon double precision,

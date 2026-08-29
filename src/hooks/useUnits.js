@@ -23,10 +23,17 @@ export function useUnits() {
       if (unitsErr) throw unitsErr
       if (projectsErr) throw projectsErr
 
-      // Index Supabase unit rows by full_address — the unique identifier for every unit
+      // Index Supabase unit rows by full_address — the unique identifier for every unit.
+      // The DB now has a UNIQUE(full_address) constraint so there's normally one row
+      // per address; the newest-wins guard is a safety net in case any pre-cleanup
+      // duplicates linger (see workings/dedupe_units.sql).
       const dbByAddress = {}
       for (const row of (dbRows || [])) {
-        if (row.full_address) dbByAddress[row.full_address] = row
+        if (!row.full_address) continue
+        const existing = dbByAddress[row.full_address]
+        if (!existing || (row.updated_at || '') > (existing.updated_at || '')) {
+          dbByAddress[row.full_address] = row
+        }
       }
 
       // Group projects by the unit they belong to
@@ -88,17 +95,19 @@ export function useUnits() {
       if (err) throw err
       dbRow = data
     } else {
-      // First time this unit is saved — insert into Supabase
+      // First time this unit is saved. Upsert on full_address (not plain
+      // insert) so a race — or a stale unit.id of null when a row already
+      // exists — updates the existing row instead of creating a duplicate.
       const { data, error: err } = await supabase
         .from('units')
-        .insert({
+        .upsert({
           full_address: unit.full_address,
           street_name: unit.street_name,
           lat: unit.lat,
           lon: unit.lon,
           ...updates,
           updated_at: now,
-        })
+        }, { onConflict: 'full_address' })
         .select()
         .single()
       if (err) throw err
@@ -128,14 +137,16 @@ export function useUnits() {
   // one yet), returning its id. Needed before a project can reference it.
   const ensureUnitRow = useCallback(async (unit) => {
     if (unit.id) return unit.id
+    // Upsert on full_address so this can't create a second row for an
+    // address that already has one (see updateUnit's insert branch).
     const { data, error: err } = await supabase
       .from('units')
-      .insert({
+      .upsert({
         full_address: unit.full_address,
         street_name: unit.street_name,
         lat: unit.lat,
         lon: unit.lon,
-      })
+      }, { onConflict: 'full_address' })
       .select()
       .single()
     if (err) throw err
