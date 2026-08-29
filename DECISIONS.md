@@ -152,6 +152,7 @@ Recorded word-for-word as written, superseding earlier speculation in this file 
 
 ## Known gaps / open items for the team
 
+- **UI:** the streets/satellite toggle sits top-right of the map, directly under the side panel's close (X), so closing the panel drops the cursor onto it — move it (bottom-right above the zoom controls is the leading idea), deferred to a later UI pass.
 - No auth on Supabase RLS policies — `select`/`update`/`insert` are all open to anyone with the anon key (`using (true)`). Fine for an internal HOA tool behind an unlisted URL, but worth revisiting if this ever gets a real login.
 - Search is a simple case-insensitive substring match on the first hit — no ranking, no autocomplete dropdown. Would need work if the address list grows or search becomes a primary interaction.
 - Status → color mapping is duplicated (Mapbox expression in `MapView.jsx` + `STATUS_CONFIG`/`STATUS_BUTTON`/`STATUS_CHIP` objects in `StatsPanel.jsx`/`UnitPopup.jsx`) rather than derived from one shared constant — update all spots together if a status or color ever changes.
