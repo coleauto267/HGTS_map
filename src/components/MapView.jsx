@@ -25,19 +25,26 @@ const STATUS_COLOR_EXPR = [
   '#60a5fa',
 ]
 
-// Selecting a unit (dot click or address search) grows its dot a little,
-// keeps its status color + urgency ring, and fades everything else back so
-// the worked-on unit stands out. `addr` is a full_address string or ''.
+// Selecting a unit (dot click or address search) blows its dot up big,
+// keeps its status color + urgency ring, and fades everything else right
+// back so the worked-on unit is unmistakable. `addr` is a full_address
+// string or ''.
 function applySelectionStyles(map, addr) {
   if (!map.getLayer(SELECTED_LAYER_ID)) return
   const sel = addr || ''
   const active = !!addr
   map.setFilter(SELECTED_LAYER_ID, ['==', ['get', 'full_address'], sel])
 
-  const dim = (match, rest) => (active ? ['case', ['==', ['get', 'full_address'], sel], match, rest] : match)
-  map.setPaintProperty(LAYER_ID, 'circle-opacity', dim(0.9, 0.15))
-  map.setPaintProperty(LABEL_LAYER_ID, 'text-opacity', dim(1, 0.12))
-  map.setPaintProperty(URGENT_RING_LAYER_ID, 'circle-stroke-opacity', dim(1, 0.15))
+  // When something is selected: everything but the selected feature drops
+  // to a faint ghost. The selected dot is carried by the SELECTED layer on
+  // top, so the base layer can fade its copy of it too.
+  const faded = active ? 0.08 : 0.9
+  map.setPaintProperty(LAYER_ID, 'circle-opacity', faded)
+  map.setPaintProperty(LAYER_ID, 'circle-stroke-opacity', active ? 0.08 : 0.6)
+  map.setPaintProperty(LABEL_LAYER_ID, 'text-opacity',
+    active ? ['case', ['==', ['get', 'full_address'], sel], 1, 0.06] : 1)
+  map.setPaintProperty(URGENT_RING_LAYER_ID, 'circle-stroke-opacity',
+    active ? ['case', ['==', ['get', 'full_address'], sel], 1, 0.08] : 1)
 }
 
 function addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef) {
@@ -108,8 +115,9 @@ function addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAd
     filter: ['==', ['get', 'full_address'], ''],
   })
 
-  // The selected unit's dot — a modest bump over the hover size, drawn on
-  // top so it reads as "this is the one open in the side panel".
+  // The selected unit's dot — blown up well past every other layer and
+  // ringed in white, drawn on top so it's obvious which unit the side
+  // panel is editing.
   map.addLayer({
     id: SELECTED_LAYER_ID,
     type: 'circle',
@@ -119,12 +127,12 @@ function addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAd
       'circle-color': STATUS_COLOR_EXPR,
       'circle-radius': [
         'interpolate', ['linear'], ['zoom'],
-        13, 5,
-        15, 9,
-        17, 15,
-        19, 22,
+        13, 9,
+        15, 16,
+        17, 24,
+        19, 34,
       ],
-      'circle-stroke-width': 2.5,
+      'circle-stroke-width': 3,
       'circle-stroke-color': '#ffffff',
       'circle-opacity': 1,
     },
@@ -299,23 +307,25 @@ export default function MapView({
   // Selection: grow the chosen dot, fade the rest, and center the map on it.
   // Same path for a dot click and an address search — both just change
   // selectedAddress. Nothing moves when selection clears (panel close).
+  // `units` is in the deps so a selection made before the data lands still
+  // gets its highlight + recenter once the units arrive.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
     applySelectionStyles(map, selectedAddress || '')
 
     if (!selectedAddress) return
-    const unit = unitsRef.current.find((u) => u.full_address === selectedAddress)
+    const unit = units.find((u) => u.full_address === selectedAddress)
     if (!unit || unit.lon == null || unit.lat == null) return
-    // resize() first so the fly targets the map's post-panel width — it
+    // resize() first so the camera targets the map's post-panel width — it
     // forces a synchronous reflow, so the new flex layout is already applied.
     map.resize()
-    map.flyTo({
-      center: [unit.lon, unit.lat],
-      zoom: Math.max(map.getZoom(), 17.5),
-      duration: 700,
-    })
-  }, [selectedAddress, mapReady])
+    const target = { center: [unit.lon, unit.lat], zoom: Math.max(map.getZoom(), 17.5) }
+    // flyTo is RAF-animated and stalls while the tab is hidden; jump instead
+    // so a background search still lands centered when the user comes back.
+    if (document.hidden) map.jumpTo(target)
+    else map.flyTo({ ...target, duration: 700 })
+  }, [selectedAddress, mapReady, units])
 
   // Toggle map style — skips the initial render so it doesn't call setStyle
   // while the map is already loading its default style.
