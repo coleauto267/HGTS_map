@@ -1,8 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import ReactDOM from 'react-dom/client'
-import UnitPopup from './UnitPopup'
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN
 
@@ -11,6 +9,7 @@ const DEFAULT_ZOOM = 15
 const SOURCE_ID = 'units'
 const LAYER_ID = 'units-circles'
 const HOVER_LAYER_ID = 'units-circles-hover'
+const SELECTED_LAYER_ID = 'units-circles-selected'
 const LABEL_LAYER_ID = 'units-labels'
 const URGENT_RING_LAYER_ID = 'units-urgent-ring'
 
@@ -26,7 +25,22 @@ const STATUS_COLOR_EXPR = [
   '#60a5fa',
 ]
 
-function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
+// Selecting a unit (dot click or address search) grows its dot a little,
+// keeps its status color + urgency ring, and fades everything else back so
+// the worked-on unit stands out. `addr` is a full_address string or ''.
+function applySelectionStyles(map, addr) {
+  if (!map.getLayer(SELECTED_LAYER_ID)) return
+  const sel = addr || ''
+  const active = !!addr
+  map.setFilter(SELECTED_LAYER_ID, ['==', ['get', 'full_address'], sel])
+
+  const dim = (match, rest) => (active ? ['case', ['==', ['get', 'full_address'], sel], match, rest] : match)
+  map.setPaintProperty(LAYER_ID, 'circle-opacity', dim(0.9, 0.15))
+  map.setPaintProperty(LABEL_LAYER_ID, 'text-opacity', dim(1, 0.12))
+  map.setPaintProperty(URGENT_RING_LAYER_ID, 'circle-stroke-opacity', dim(1, 0.15))
+}
+
+function addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef) {
   map.addSource(SOURCE_ID, {
     type: 'geojson',
     data: unitsToGeoJSON(unitsRef.current),
@@ -91,7 +105,29 @@ function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
       'circle-stroke-color': '#ffffff',
       'circle-opacity': 1,
     },
-    filter: ['==', ['get', 'id'], ''],
+    filter: ['==', ['get', 'full_address'], ''],
+  })
+
+  // The selected unit's dot — a modest bump over the hover size, drawn on
+  // top so it reads as "this is the one open in the side panel".
+  map.addLayer({
+    id: SELECTED_LAYER_ID,
+    type: 'circle',
+    source: SOURCE_ID,
+    filter: ['==', ['get', 'full_address'], ''],
+    paint: {
+      'circle-color': STATUS_COLOR_EXPR,
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        13, 5,
+        15, 9,
+        17, 15,
+        19, 22,
+      ],
+      'circle-stroke-width': 2.5,
+      'circle-stroke-color': '#ffffff',
+      'circle-opacity': 1,
+    },
   })
 
   map.addLayer({
@@ -114,31 +150,29 @@ function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
 
   map.on('mousemove', LAYER_ID, (e) => {
     map.getCanvas().style.cursor = 'pointer'
-    const id = e.features[0]?.properties?.id
-    if (id && id !== hoveredIdRef.current) {
-      hoveredIdRef.current = id
-      map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'id'], id])
+    const addr = e.features[0]?.properties?.full_address
+    if (addr && addr !== hoveredAddrRef.current) {
+      hoveredAddrRef.current = addr
+      map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'full_address'], addr])
     }
   })
 
   map.on('mouseleave', LAYER_ID, () => {
     map.getCanvas().style.cursor = ''
-    hoveredIdRef.current = null
-    map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'id'], ''])
+    hoveredAddrRef.current = null
+    map.setFilter(HOVER_LAYER_ID, ['==', ['get', 'full_address'], ''])
   })
 
   const handleUnitClick = (e) => {
-    const props = e.features[0]?.properties
-    if (!props) return
-    const unit = unitsRef.current.find((u) =>
-      u.id === props.id ||
-      (!props.id && u.full_address === props.full_address)
-    )
-    if (!unit) return
-    openPopup(map, unit, e.lngLat)
+    const addr = e.features[0]?.properties?.full_address
+    if (addr) onSelectUnitRef.current(addr)
   }
   map.on('click', LAYER_ID, handleUnitClick)
   map.on('click', LABEL_LAYER_ID, handleUnitClick)
+
+  // Re-apply the current selection after a fresh layer build (initial load
+  // and every style swap, which wipes custom layers).
+  applySelectionStyles(map, selectedAddrRef.current)
 }
 
 // The map needs one color + one ring per dot, but priority now lives on
@@ -176,28 +210,28 @@ function unitsToGeoJSON(units) {
 export default function MapView({
   units,
   activeFilter,
-  searchTarget,
-  onSearchConsumed,
-  onUnitUpdate,
-  onAddProject,
-  onUpdateProject,
-  onDeleteProject,
+  selectedAddress,
+  onSelectUnit,
   mapStyle,
 }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
-  const popupRef = useRef(null)
-  const popupRootRef = useRef(null)
-  const hoveredIdRef = useRef(null)
+  const hoveredAddrRef = useRef(null)
   const unitsRef = useRef(units)
+  // Kept in refs so the once-registered map event handlers always see the
+  // latest values without re-binding listeners.
+  const onSelectUnitRef = useRef(onSelectUnit)
+  const selectedAddrRef = useRef(selectedAddress)
   // Prevents the mapStyle effect from calling setStyle on the initial render,
   // which would cancel the in-progress map load and drop the first data update.
   const mapStyleReady = useRef(false)
+  // Gates the selection effect until layers exist — otherwise selecting a
+  // unit before the map finishes loading would silently do nothing.
+  const [mapReady, setMapReady] = useState(false)
 
-  // Keep unitsRef in sync so popup callbacks always see latest data
-  useEffect(() => {
-    unitsRef.current = units
-  }, [units])
+  useEffect(() => { unitsRef.current = units }, [units])
+  useEffect(() => { onSelectUnitRef.current = onSelectUnit }, [onSelectUnit])
+  useEffect(() => { selectedAddrRef.current = selectedAddress }, [selectedAddress])
 
   // Initialize map once
   useEffect(() => {
@@ -215,21 +249,27 @@ export default function MapView({
     map.addControl(new mapboxgl.ScaleControl(), 'bottom-left')
 
     map.on('load', () => {
-      addMapLayers(map, unitsRef, hoveredIdRef, openPopup)
+      addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef)
 
-      // Close popup on background click
+      // Click on empty map = clear selection (closes the side panel)
       map.on('click', (e) => {
         const features = map.queryRenderedFeatures(e.point, { layers: [LAYER_ID, LABEL_LAYER_ID] })
-        if (!features.length) closePopup()
+        if (!features.length) onSelectUnitRef.current(null)
       })
+
+      setMapReady(true)
     })
+
+    // The side panel mounts/unmounts next to the map, changing its width.
+    // Mapbox doesn't watch its container, so nudge it on every resize.
+    const ro = new ResizeObserver(() => map.resize())
+    ro.observe(containerRef.current)
 
     mapRef.current = map
     return () => {
-      closePopup()
+      ro.disconnect()
       map.remove()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update source data when units change.
@@ -256,21 +296,26 @@ export default function MapView({
     map.setFilter(URGENT_RING_LAYER_ID, ringFilter)
   }, [activeFilter])
 
-  // Fly to search target
+  // Selection: grow the chosen dot, fade the rest, and center the map on it.
+  // Same path for a dot click and an address search — both just change
+  // selectedAddress. Nothing moves when selection clears (panel close).
   useEffect(() => {
-    if (!searchTarget || !mapRef.current) return
-    mapRef.current.flyTo({
-      center: [searchTarget.lon, searchTarget.lat],
-      zoom: 18,
-      duration: 1200,
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    applySelectionStyles(map, selectedAddress || '')
+
+    if (!selectedAddress) return
+    const unit = unitsRef.current.find((u) => u.full_address === selectedAddress)
+    if (!unit || unit.lon == null || unit.lat == null) return
+    // resize() first so the fly targets the map's post-panel width — it
+    // forces a synchronous reflow, so the new flex layout is already applied.
+    map.resize()
+    map.flyTo({
+      center: [unit.lon, unit.lat],
+      zoom: Math.max(map.getZoom(), 17.5),
+      duration: 700,
     })
-    // Open popup after fly
-    setTimeout(() => {
-      if (mapRef.current) openPopup(mapRef.current, searchTarget, { lng: searchTarget.lon, lat: searchTarget.lat })
-    }, 1300)
-    onSearchConsumed()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTarget])
+  }, [selectedAddress, mapReady])
 
   // Toggle map style — skips the initial render so it doesn't call setStyle
   // while the map is already loading its default style.
@@ -287,62 +332,10 @@ export default function MapView({
 
     // Re-add layers after style change
     map.once('style.load', () => {
-      addMapLayers(map, unitsRef, hoveredIdRef, openPopup)
+      addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef)
     })
     map.setStyle(styleUrl)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapStyle])
-
-  const closePopup = useCallback(() => {
-    if (popupRef.current) {
-      popupRef.current.remove()
-      popupRef.current = null
-    }
-    if (popupRootRef.current) {
-      popupRootRef.current.unmount()
-      popupRootRef.current = null
-    }
-  }, [])
-
-  const openPopup = useCallback((map, unit, lngLat) => {
-    closePopup()
-    const container = document.createElement('div')
-    const root = ReactDOM.createRoot(container)
-    popupRootRef.current = root
-
-    const renderPopup = (currentUnit) => {
-      root.render(
-        <UnitPopup
-          unit={currentUnit}
-          onClose={closePopup}
-          onSave={async (unit, updates) => {
-            const updated = await onUnitUpdate(unit, updates)
-            renderPopup(updated)
-          }}
-          onAddProject={async (unit, projectData) => {
-            const updated = await onAddProject(unit, projectData)
-            renderPopup(updated)
-          }}
-          onUpdateProject={async (unit, project, updates) => {
-            const updated = await onUpdateProject(unit, project, updates)
-            renderPopup(updated)
-          }}
-          onDeleteProject={async (unit, project) => {
-            const updated = await onDeleteProject(unit, project)
-            renderPopup(updated)
-          }}
-        />
-      )
-    }
-    renderPopup(unit)
-
-    const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, maxWidth: 'none' })
-      .setLngLat(lngLat)
-      .setDOMContent(container)
-      .addTo(map)
-
-    popupRef.current = popup
-  }, [closePopup, onUnitUpdate, onAddProject, onUpdateProject, onDeleteProject])
 
   return (
     <div ref={containerRef} className="absolute inset-0 w-full h-full" />
