@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { IconLayoutSidebar, IconLayoutSidebarRight, IconKey, IconArrowsDiagonal, IconArrowsDiagonalMinimize } from '@tabler/icons-react'
+import { IconLayoutSidebar, IconLayoutSidebarRight, IconKey, IconArrowsDiagonal, IconArrowsDiagonalMinimize, IconTrash } from '@tabler/icons-react'
 
 const STATUS_OPTIONS = [
   { value: 'none', label: 'No Status' },
@@ -37,10 +37,24 @@ const fieldClass = 'w-full bg-slate-800 border border-slate-700 text-white text-
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
 // One collapsed punch-list row: checkbox to mark done at a glance, click
-// anywhere else on the row to drill into TaskDetail. Purely presentational —
-// no local edit state, since editing only happens in the detail view.
-function TaskRow({ project, onSelect, onToggleDone }) {
+// the task name to drill into TaskDetail, trash icon to delete it outright
+// (with an inline confirm so a misclick can't wipe a task). Marking done
+// keeps the row as history; deleting is for undoing a mistaken add.
+function TaskRow({ project, onSelect, onToggleDone, onDelete }) {
   const isDone = project.status === 'done'
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await onDelete()
+    } catch (err) {
+      console.error('Delete task failed:', err)
+      setDeleting(false)
+      setConfirmingDelete(false)
+    }
+  }
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800/70 hover:bg-slate-800 flex-shrink-0">
@@ -61,10 +75,49 @@ function TaskRow({ project, onSelect, onToggleDone }) {
         <span className={`flex-1 text-sm capitalize truncate ${isDone ? 'line-through text-slate-500' : 'text-white'}`}>
           {project.task}
         </span>
-        <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
       </button>
+
+      {confirmingDelete ? (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-xs font-semibold text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded
+                       cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deleting ? '…' : 'Delete'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(false)}
+            className="text-xs text-slate-400 hover:text-white px-1.5 py-0.5 rounded cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            aria-label={`Delete ${project.task}`}
+            className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer flex-shrink-0"
+          >
+            <IconTrash className="w-4 h-4" stroke={2} />
+          </button>
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-label={`Open ${project.task}`}
+            className="text-slate-400 hover:text-white transition-colors cursor-pointer flex-shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -113,7 +166,7 @@ function TaskDetail({ project, onBack, onSaved, onUpdate, onToggleDone }) {
   // textarea instead of pushing anything taller.
   if (notesExpanded) {
     return (
-      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-2.5 max-h-[17.5rem] flex flex-col">
+      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-2.5 h-[17.5rem] flex flex-col">
         <button
           type="button"
           onClick={() => setNotesExpanded(false)}
@@ -238,7 +291,7 @@ function TaskDetail({ project, onBack, onSaved, onUpdate, onToggleDone }) {
   )
 }
 
-export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdateProject }) {
+export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdateProject, onDeleteProject }) {
   const [status, setStatus] = useState(unit.status)
   const [occupant, setOccupant] = useState(unit.occupant || '')
   const [phone, setPhone] = useState(unit.phone || '')
@@ -394,6 +447,75 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
                     date_completed: isDone ? null : todayISO(),
                   })}
                 />
+              ) : addingTask ? (
+                /* New-task form REPLACES the punch list (same as drilling into
+                   a task) rather than expanding the card downward. */
+                <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setAddingTask(false)}
+                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Back to tasks
+                  </button>
+
+                  <select
+                    value={newTask}
+                    onChange={(e) => setNewTask(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select task type...</option>
+                    {TASK_OPTIONS.map((t) => (
+                      <option key={t} value={t} className="capitalize">{t}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {PRIORITY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <textarea
+                    value={newNotes}
+                    onChange={(e) => setNewNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Notes (optional)"
+                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                               resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-600"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAddTask}
+                      disabled={!newTask || addingSaving}
+                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500
+                                 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      {addingSaving ? 'Adding…' : 'Add Task'}
+                    </button>
+                    <button
+                      onClick={() => setAddingTask(false)}
+                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-700
+                                 text-slate-300 hover:bg-slate-800 transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <>
                   {projects.length > 0 && (
@@ -407,76 +529,19 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
                             status: isDone ? 'open' : 'done',
                             date_completed: isDone ? null : todayISO(),
                           })}
+                          onDelete={() => onDeleteProject(unit, project)}
                         />
                       ))}
                     </div>
                   )}
 
-                  {addingTask ? (
-                    <div className="rounded-lg border border-blue-500/50 bg-slate-800/50 p-3 space-y-2 mt-2">
-                      <select
-                        value={newTask}
-                        onChange={(e) => setNewTask(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Select task type...</option>
-                        {TASK_OPTIONS.map((t) => (
-                          <option key={t} value={t} className="capitalize">{t}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={newPriority}
-                        onChange={(e) => setNewPriority(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {PRIORITY_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="date"
-                        value={newDate}
-                        onChange={(e) => setNewDate(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <textarea
-                        value={newNotes}
-                        onChange={(e) => setNewNotes(e.target.value)}
-                        rows={2}
-                        placeholder="Notes (optional)"
-                        className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                                   resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-600"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleAddTask}
-                          disabled={!newTask || addingSaving}
-                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500
-                                     text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
-                        >
-                          {addingSaving ? 'Adding…' : 'Add Task'}
-                        </button>
-                        <button
-                          onClick={() => setAddingTask(false)}
-                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-700
-                                     text-slate-300 hover:bg-slate-800 transition-all cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setAddingTask(true)}
-                      className="w-full mt-2 py-1.5 rounded-lg text-xs font-semibold border border-dashed border-slate-600
-                                 text-slate-400 hover:text-white hover:border-slate-400 transition-all cursor-pointer"
-                    >
-                      + Add Task
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setAddingTask(true)}
+                    className="w-full mt-2 py-1.5 rounded-lg text-xs font-semibold border border-dashed border-slate-600
+                               text-slate-400 hover:text-white hover:border-slate-400 transition-all cursor-pointer"
+                  >
+                    + Add Task
+                  </button>
                 </>
               )}
             </div>

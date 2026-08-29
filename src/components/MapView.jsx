@@ -181,6 +181,7 @@ export default function MapView({
   onUnitUpdate,
   onAddProject,
   onUpdateProject,
+  onDeleteProject,
   mapStyle,
 }) {
   const containerRef = useRef(null)
@@ -326,6 +327,10 @@ export default function MapView({
             const updated = await onUpdateProject(unit, project, updates)
             renderPopup(updated)
           }}
+          onDeleteProject={async (unit, project) => {
+            const updated = await onDeleteProject(unit, project)
+            renderPopup(updated)
+          }}
         />
       )
     }
@@ -337,7 +342,7 @@ export default function MapView({
       .addTo(map)
 
     popupRef.current = popup
-  }, [closePopup, onUnitUpdate, onAddProject, onUpdateProject])
+  }, [closePopup, onUnitUpdate, onAddProject, onUpdateProject, onDeleteProject])
 
   return (
     <div ref={containerRef} className="absolute inset-0 w-full h-full" />

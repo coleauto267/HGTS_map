@@ -158,6 +158,23 @@ export function useUnits() {
     return updatedUnit
   }, [ensureUnitRow])
 
+  // Permanently removes a task (project row). Used for undoing a mistaken
+  // add — distinct from marking a task 'done', which keeps it as history.
+  const deleteProject = useCallback(async (unit, project) => {
+    const { error: err } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', project.id)
+    if (err) throw err
+
+    const updatedUnit = {
+      ...unit,
+      projects: (unit.projects || []).filter((p) => p.id !== project.id),
+    }
+    setUnits((prev) => prev.map((u) => (u.full_address === unit.full_address ? updatedUnit : u)))
+    return updatedUnit
+  }, [])
+
   // Updates an existing task (project row) — priority/notes edits, or
   // flipping status between 'open' and 'done'.
   const updateProject = useCallback(async (unit, project, updates) => {
@@ -178,5 +195,5 @@ export function useUnits() {
     return updatedUnit
   }, [])
 
-  return { units, loading, error, updateUnit, addProject, updateProject }
+  return { units, loading, error, updateUnit, addProject, updateProject, deleteProject }
 }

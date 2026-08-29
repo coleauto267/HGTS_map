@@ -4,7 +4,7 @@ import StatsPanel from './components/StatsPanel'
 import { useUnits } from './hooks/useUnits'
 
 export default function App() {
-  const { units, loading, error, updateUnit, addProject, updateProject } = useUnits()
+  const { units, loading, error, updateUnit, addProject, updateProject, deleteProject } = useUnits()
   const [activeFilter, setActiveFilter] = useState(null)
   const [searchTarget, setSearchTarget] = useState(null)
   const [mapStyle, setMapStyle] = useState('streets')
@@ -30,6 +30,7 @@ export default function App() {
         onUnitUpdate={updateUnit}
         onAddProject={addProject}
         onUpdateProject={updateProject}
+        onDeleteProject={deleteProject}
         mapStyle={mapStyle}
       />
 
