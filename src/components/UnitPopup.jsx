@@ -69,33 +69,33 @@ function TaskRow({ project, expanded, onToggleExpand, onUpdate, onToggleDone }) 
 
   return (
     <div className="rounded-lg border border-slate-700 overflow-hidden flex-shrink-0">
-      <button
-        type="button"
-        onClick={onToggleExpand}
-        className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/70 hover:bg-slate-800 text-left cursor-pointer"
-      >
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[project.priority]}`} />
-        <span className={`flex-1 text-sm capitalize truncate ${isDone ? 'line-through text-slate-500' : 'text-white'}`}>
-          {project.task}
-        </span>
-        <svg className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
-             fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+      <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/70 hover:bg-slate-800">
+        <input
+          type="checkbox"
+          checked={isDone}
+          onChange={(e) => { e.stopPropagation(); onToggleDone(isDone) }}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={isDone ? `Mark ${project.task} not done` : `Mark ${project.task} done`}
+          className="cursor-pointer accent-blue-600 w-4 h-4 flex-shrink-0"
+        />
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer"
+        >
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[project.priority]}`} />
+          <span className={`flex-1 text-sm capitalize truncate ${isDone ? 'line-through text-slate-500' : 'text-white'}`}>
+            {project.task}
+          </span>
+          <svg className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+               fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
 
       {expanded && (
         <div className="p-3 space-y-2.5 border-t border-slate-700">
-          <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isDone}
-              onChange={() => onToggleDone(isDone)}
-              className="cursor-pointer accent-blue-600 w-4 h-4"
-            />
-            Mark done
-          </label>
-
           <div>
             <label className="block text-xs text-slate-400 font-medium mb-1 uppercase tracking-wider">
               Priority
