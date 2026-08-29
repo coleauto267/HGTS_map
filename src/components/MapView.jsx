@@ -42,6 +42,13 @@ function applySelectionStyles(map, addr) {
 }
 
 function addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef) {
+  // The basemap draws its own house numbers; hide them so they don't
+  // double up with our units-labels layer. Runs again after every style
+  // swap since setStyle restores the basemap's own layers.
+  for (const id of ['building-number-label', 'housenum-label', 'address-number-label']) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none')
+  }
+
   map.addSource(SOURCE_ID, {
     type: 'geojson',
     data: unitsToGeoJSON(unitsRef.current),
