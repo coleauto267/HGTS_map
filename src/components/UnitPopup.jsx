@@ -36,6 +36,16 @@ const fieldClass = 'w-full bg-slate-800 border border-slate-700 text-white text-
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
+// Supabase stores dates as ISO (yyyy-mm-dd); show them US-style m/d/yyyy.
+// Split the string rather than `new Date(iso)` — the latter parses as UTC
+// midnight and reads back a day early in US timezones.
+const formatDate = (iso) => {
+  if (!iso) return '—'
+  const [y, m, d] = iso.split('-')
+  if (!y || !m || !d) return iso
+  return `${Number(m)}/${Number(d)}/${y}`
+}
+
 // One collapsed punch-list row: checkbox to mark done at a glance, click
 // the task name to drill into TaskDetail, trash icon to delete it outright
 // (with an inline confirm so a misclick can't wipe a task). Marking done
@@ -275,8 +285,8 @@ function TaskDetail({ project, onBack, onSaved, onUpdate, onToggleDone }) {
       </div>
 
       <div className="text-xs text-slate-500">
-        Added {project.date_added || '—'}
-        {project.date_completed ? ` · Completed ${project.date_completed}` : ''}
+        Added {formatDate(project.date_added)}
+        {project.date_completed ? ` · Completed ${formatDate(project.date_completed)}` : ''}
       </div>
 
       <button
@@ -330,8 +340,11 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
         email,
         universal_key: universalKey,
       })
+      // Flash the green "Saved!" state briefly, then close the popup so the
+      // user drops back to the plain map. Only the unit-card save does this;
+      // task saves stay open.
       setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      setTimeout(() => onClose(), 1000)
     } catch (err) {
       console.error('Save failed:', err)
     } finally {
