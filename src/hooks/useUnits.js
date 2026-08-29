@@ -14,22 +14,31 @@ export function useUnits() {
       const res = await fetch('/HGTS_Addresses.geojson')
       const geojson = await res.json()
 
-      // Load all Supabase rows for status + notes (no pagination needed — 732 rows)
-      const { data: dbRows, error: fetchErr } = await supabase
-        .from('units')
-        .select('*')
-        .limit(5000)
-      if (fetchErr) throw fetchErr
+      // Load unit-level rows (identity/contact + manual status) and every
+      // project (task) row — no pagination needed at this scale
+      const [{ data: dbRows, error: unitsErr }, { data: projectRows, error: projectsErr }] = await Promise.all([
+        supabase.from('units').select('*').limit(5000),
+        supabase.from('projects').select('*').limit(20000),
+      ])
+      if (unitsErr) throw unitsErr
+      if (projectsErr) throw projectsErr
 
-      // Index Supabase rows by full_address — the unique identifier for every unit
+      // Index Supabase unit rows by full_address — the unique identifier for every unit
       const dbByAddress = {}
       for (const row of (dbRows || [])) {
         if (row.full_address) dbByAddress[row.full_address] = row
       }
 
-      // Merge: GeoJSON drives coords/identity, Supabase drives status/notes/id
+      // Group projects by the unit they belong to
+      const projectsByUnitId = {}
+      for (const p of (projectRows || [])) {
+        if (!projectsByUnitId[p.unit_id]) projectsByUnitId[p.unit_id] = []
+        projectsByUnitId[p.unit_id].push(p)
+      }
+
+      // Merge: GeoJSON drives coords/identity, Supabase drives status/contact/id,
+      // and each unit's projects (tasks) come along keyed by unit_id
       const merged = geojson.features.map((f) => {
-        const parcelId = f.properties.ParcelID || ''
         const fullAddr = f.properties.Full_Addr || ''
         const dbRow = dbByAddress[fullAddr] || null
 
@@ -37,18 +46,15 @@ export function useUnits() {
           id: dbRow?.id || null,
           full_address: fullAddr,
           street_name: f.properties.St_Name || '',
-          parcel_id: parcelId,
           post_code: f.properties.Post_Code || '18974',
           lat: f.properties.Lat ?? f.geometry?.coordinates?.[1] ?? null,
           lon: f.properties.Long ?? f.geometry?.coordinates?.[0] ?? null,
           status: dbRow?.status || 'none',
-          notes: dbRow?.notes || '',
-          urgency: dbRow?.urgency || 'low',
           occupant: dbRow?.occupant || '',
           phone: dbRow?.phone || '',
           email: dbRow?.email || '',
           universal_key: dbRow?.universal_key || false,
-          job_title: dbRow?.job_title || [],
+          projects: dbRow?.id ? (projectsByUnitId[dbRow.id] || []) : [],
         }
       })
 
@@ -65,8 +71,9 @@ export function useUnits() {
     loadUnits()
   }, [loadUnits])
 
-  // Takes the full unit object (not just id) so we can insert if it hasn't
-  // been saved to Supabase yet (id === null).
+  // Saves unit-level fields (status, occupant, phone, email, universal_key)
+  // to `units`. Takes the full unit object (not just id) so we can insert if
+  // it hasn't been saved to Supabase yet (id === null).
   const updateUnit = useCallback(async (unit, updates) => {
     const now = new Date().toISOString()
     let dbRow
@@ -87,7 +94,6 @@ export function useUnits() {
         .insert({
           full_address: unit.full_address,
           street_name: unit.street_name,
-          parcel_id: unit.parcel_id,
           lat: unit.lat,
           lon: unit.lon,
           ...updates,
@@ -103,13 +109,10 @@ export function useUnits() {
       ...unit,
       id: dbRow.id,
       status: dbRow.status,
-      notes: dbRow.notes,
-      urgency: dbRow.urgency,
       occupant: dbRow.occupant,
       phone: dbRow.phone,
       email: dbRow.email,
       universal_key: dbRow.universal_key,
-      job_title: dbRow.job_title,
     }
 
     setUnits((prev) => prev.map((u) => {
@@ -121,5 +124,59 @@ export function useUnits() {
     return updatedUnit
   }, [])
 
-  return { units, loading, error, updateUnit }
+  // Makes sure `unit` has a row in `units` (bare insert if it doesn't have
+  // one yet), returning its id. Needed before a project can reference it.
+  const ensureUnitRow = useCallback(async (unit) => {
+    if (unit.id) return unit.id
+    const { data, error: err } = await supabase
+      .from('units')
+      .insert({
+        full_address: unit.full_address,
+        street_name: unit.street_name,
+        lat: unit.lat,
+        lon: unit.lon,
+      })
+      .select()
+      .single()
+    if (err) throw err
+    return data.id
+  }, [])
+
+  // Adds a new task (project row) for a unit. Creates the unit's row first
+  // if this is the very first thing ever saved for it.
+  const addProject = useCallback(async (unit, projectData) => {
+    const unitId = await ensureUnitRow(unit)
+    const { data, error: err } = await supabase
+      .from('projects')
+      .insert({ unit_id: unitId, ...projectData })
+      .select()
+      .single()
+    if (err) throw err
+
+    const updatedUnit = { ...unit, id: unitId, projects: [...(unit.projects || []), data] }
+    setUnits((prev) => prev.map((u) => (u.full_address === unit.full_address ? updatedUnit : u)))
+    return updatedUnit
+  }, [ensureUnitRow])
+
+  // Updates an existing task (project row) — priority/notes edits, or
+  // flipping status between 'open' and 'done'.
+  const updateProject = useCallback(async (unit, project, updates) => {
+    const now = new Date().toISOString()
+    const { data, error: err } = await supabase
+      .from('projects')
+      .update({ ...updates, updated_at: now })
+      .eq('id', project.id)
+      .select()
+      .single()
+    if (err) throw err
+
+    const updatedUnit = {
+      ...unit,
+      projects: unit.projects.map((p) => (p.id === data.id ? data : p)),
+    }
+    setUnits((prev) => prev.map((u) => (u.full_address === unit.full_address ? updatedUnit : u)))
+    return updatedUnit
+  }, [])
+
+  return { units, loading, error, updateUnit, addProject, updateProject }
 }

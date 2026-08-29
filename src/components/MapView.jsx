@@ -37,10 +37,10 @@ function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
     id: URGENT_RING_LAYER_ID,
     type: 'circle',
     source: SOURCE_ID,
-    filter: ['in', ['get', 'urgency'], ['literal', ['urgent', 'emergency']]],
+    filter: ['in', ['get', 'ring_priority'], ['literal', ['medium', 'urgent']]],
     paint: {
       'circle-color': 'rgba(0,0,0,0)',
-      'circle-stroke-color': '#ffffff',
+      'circle-stroke-color': ['match', ['get', 'ring_priority'], 'urgent', '#eab308', '#ffffff'],
       'circle-stroke-width': 5,
       'circle-radius': [
         'interpolate', ['linear'], ['zoom'],
@@ -141,6 +141,18 @@ function addMapLayers(map, unitsRef, hoveredIdRef, openPopup) {
   map.on('click', LABEL_LAYER_ID, handleUnitClick)
 }
 
+// The map needs one color + one ring per dot, but priority now lives on
+// however many open tasks a unit has — so we collapse them here to whichever
+// is worse: urgent beats medium beats low (low/no open tasks = no ring).
+function ringPriorityFor(unit) {
+  const openPriorities = (unit.projects || [])
+    .filter((p) => p.status === 'open')
+    .map((p) => p.priority)
+  if (openPriorities.includes('urgent')) return 'urgent'
+  if (openPriorities.includes('medium')) return 'medium'
+  return 'low'
+}
+
 function unitsToGeoJSON(units) {
   return {
     type: 'FeatureCollection',
@@ -153,10 +165,8 @@ function unitsToGeoJSON(units) {
           id: u.id,
           full_address: u.full_address,
           street_name: u.street_name || '',
-          parcel_id: u.parcel_id || '',
           status: u.status,
-          notes: u.notes || '',
-          urgency: u.urgency || 'low',
+          ring_priority: ringPriorityFor(u),
           addr_num: u.full_address?.split(' ')[0] || '',
         },
       })),
@@ -169,6 +179,8 @@ export default function MapView({
   searchTarget,
   onSearchConsumed,
   onUnitUpdate,
+  onAddProject,
+  onUpdateProject,
   mapStyle,
 }) {
   const containerRef = useRef(null)
@@ -236,11 +248,11 @@ export default function MapView({
     const filter = activeFilter ? ['==', ['get', 'status'], activeFilter] : null
     map.setFilter(LAYER_ID, filter)
     map.setFilter(LABEL_LAYER_ID, filter)
-    const isUrgentExpr = ['in', ['get', 'urgency'], ['literal', ['urgent', 'emergency']]]
-    const urgentFilter = activeFilter
-      ? ['all', isUrgentExpr, ['==', ['get', 'status'], activeFilter]]
-      : isUrgentExpr
-    map.setFilter(URGENT_RING_LAYER_ID, urgentFilter)
+    const hasRingExpr = ['in', ['get', 'ring_priority'], ['literal', ['medium', 'urgent']]]
+    const ringFilter = activeFilter
+      ? ['all', hasRingExpr, ['==', ['get', 'status'], activeFilter]]
+      : hasRingExpr
+    map.setFilter(URGENT_RING_LAYER_ID, ringFilter)
   }, [activeFilter])
 
   // Fly to search target
@@ -306,6 +318,14 @@ export default function MapView({
             const updated = await onUnitUpdate(unit, updates)
             renderPopup(updated)
           }}
+          onAddProject={async (unit, projectData) => {
+            const updated = await onAddProject(unit, projectData)
+            renderPopup(updated)
+          }}
+          onUpdateProject={async (unit, project, updates) => {
+            const updated = await onUpdateProject(unit, project, updates)
+            renderPopup(updated)
+          }}
         />
       )
     }
@@ -317,7 +337,7 @@ export default function MapView({
       .addTo(map)
 
     popupRef.current = popup
-  }, [closePopup, onUnitUpdate])
+  }, [closePopup, onUnitUpdate, onAddProject, onUpdateProject])
 
   return (
     <div ref={containerRef} className="absolute inset-0 w-full h-full" />

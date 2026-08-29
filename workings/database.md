@@ -18,8 +18,8 @@ SQL only runs when JavaScript asks it to — it never runs by itself in the back
 One table can hold one value per column per row just fine (a property's occupant, phone, etc.). It breaks down when something needs to hold a *list* — like "this property needs bathroom work AND kitchen work." Cramming a list into one row is messy and makes filtering/reporting hard.
 
 **The fix:** a second table, where each row is one item in that list.
-- `units` = one row per property (identity, contact info)
-- `projects` = one row per piece of work on a property (job, status, priority, dates, notes)
+- `units` = one row per property (identity, contact info, plus its own manually-set `status`)
+- `projects` = one row per piece of work on a property (task, status, priority, dates, notes)
 
 A property with 3 issues = 3 rows in `projects`, not 3 columns crammed into 1 row.
 
@@ -47,7 +47,7 @@ If you linked tables using `full_address` instead of `id`, fixing a typo in an a
 They don't "talk" continuously — there's no live connection running between them. The relationship only matters when the app asks a question, using a **join**:
 
 ```sql
-select units.full_address, projects.job, projects.status
+select units.full_address, projects.task, projects.status
 from units
 join projects on projects.unit_id = units.id
 where units.full_address = '1 Adams St';
@@ -76,14 +76,21 @@ Two different jobs:
 
 `updated_at` is one timestamp per **row**, not per column — changing any single field (occupant, status, whatever) overwrites the same timestamp. It doesn't track which field changed or what the old value was.
 
-## Why `job` (and `status`, `priority`) are restricted options, not free text
-If `job` were a plain text box, someone could type "beems" instead of "beams." Filtering (`where job = 'beams'`) would silently miss that row — no error, just wrong results. Restricting it to a fixed list (dropdown in the UI + a `check` constraint in SQL) makes bad data impossible to enter in the first place. (This column was originally called `category` — renamed to `job` for clarity, same restricted-list idea either way.)
+## Why `task` (and `status`, `priority`) are restricted options, not free text
+If `task` were a plain text box, someone could type "beems" instead of "beams." Filtering (`where task = 'beams'`) would silently miss that row — no error, just wrong results. Restricting it to a fixed list (dropdown in the UI + a `check` constraint in SQL) makes bad data impossible to enter in the first place. (This column has been renamed twice — `category` → `job` → `task` — same restricted-list idea either way.)
+
+## Two different `status` columns — don't mix them up
+Both `units` and `projects` have a column called `status`, but they mean different things and have different shapes:
+- **`units.status`** — `none` / `needs_work` / `in_progress` / `completed`. Set **manually** by the user, drives the map dot color. Not affected by any task's status.
+- **`projects.status`** — just `open` / `done`, binary. Represents whether **that one task** is finished, shown in the UI as a struck-through punch-list item when marked done. Independent of `units.status` — they don't sync automatically (see the open item on this in `DECISIONS.md`).
+
+`projects.priority` is separate again — `low` / `medium` / `urgent`, drives the ring color around the dot on the map, computed from a unit's open tasks.
 
 ## Filtering in the UI without anyone typing SQL
 Filtering is just a query — the user never sees or types it. They click a button (e.g. "Beams"), and JavaScript translates that click into a query automatically:
 
 ```js
-supabase.from('projects').select('*').eq('job', 'beams')
+supabase.from('projects').select('*').eq('task', 'beams')
 ```
 
 Same pattern the app already uses for status filter chips.
@@ -91,21 +98,21 @@ Same pattern the app already uses for status filter chips.
 ## How project history works — no separate history table
 `projects` acts as its own history, as long as we follow **one rule: never overwrite or reset an old row — always add a new one.**
 
-- A completed project isn't deleted. It just sits there with `status = 'completed'` and a `date_completed`.
-- If the same category needs work again later (e.g. a second bathroom issue years after the first was completed), that becomes a **brand-new row** — not a reset of the old one.
+- A done task isn't deleted. It just sits there with `status = 'done'` and a `date_completed`.
+- If the same task type needs work again later (e.g. a second bathroom issue years after the first was done), that becomes a **brand-new row** — not a reset of the old one.
 
-**What makes two jobs in the same category "different" jobs?** Not their status or dates — it's that they're separate rows, each with its own `id`. Two rows could even have identical status/date/notes and still be two different jobs, purely because they're two different rows. Status and dates are just details a person reads to tell them apart at a glance; the database tells them apart by row identity alone.
+**What makes two tasks of the same type "different" tasks?** Not their status or dates — it's that they're separate rows, each with its own `id`. Two rows could even have identical status/date/notes and still be two different tasks, purely because they're two different rows. Status and dates are just details a person reads to tell them apart at a glance; the database tells them apart by row identity alone.
 
 ## Open item: materials (not built, idea only)
 
-If reporting ever needs to go a level deeper than job type — down to specific materials used (grout, 2x4 lumber, PEX pipe) — that's a different *shape* of relationship than `units → projects`, worth having on record:
+If reporting ever needs to go a level deeper than task type — down to specific materials used (grout, 2x4 lumber, PEX pipe) — that's a different *shape* of relationship than `units → projects`, worth having on record:
 
 - `units → projects` is **one-to-many**: one unit has many projects. Needed only one foreign key (`unit_id` on `projects`).
 - `projects → materials` would be **many-to-many**: one project can use many materials, and the same material gets reused across many different projects. That needs a **junction table** in between, not just one foreign key.
 
 Shape, if built:
-- **`materials`** — the master list/catalog of every possible material. Could grow to hundreds of rows. Adding a new one is just inserting a row, not editing a `check` constraint (unlike `job`, which is a short fixed list — materials are too abundant/varied for that).
-- **`project_materials`** — the junction table. One row per (project, material) pairing — e.g. `project_id`, `material_id`, `quantity`. This is what actually assigns a material to a specific job.
+- **`materials`** — the master list/catalog of every possible material. Could grow to hundreds of rows. Adding a new one is just inserting a row, not editing a `check` constraint (unlike `task`, which is a short fixed list — materials are too abundant/varied for that).
+- **`project_materials`** — the junction table. One row per (project, material) pairing — e.g. `project_id`, `material_id`, `quantity`. This is what actually assigns a material to a specific task.
 
 **Status: not built, not requested yet.** `notes` on `projects` covers "what materials were used" fine until there's a real, confirmed need for material-level reporting. Documented here so the shape is ready if that need comes up.
 
@@ -120,6 +127,6 @@ Two different ways to build "only allow certain values" — which to use depends
 | Adding a new option | Requires a schema change (`alter table`) | Just insert a new row — no schema change |
 | Extra info per option? | No — just the value itself | Yes — can attach other columns (price, supplier, unit, etc.) |
 | Extra tables needed | None | One (plus a junction table if it's many-to-many, like materials) |
-| Used in this project for | `job`, `status`, `priority` | `materials` (planned, not built) |
+| Used in this project for | `task`, `status`, `priority` | `materials` (planned, not built) |
 
 **Rule of thumb:** small and stable → `check` constraint. Large and/or growing → lookup table.

@@ -12,6 +12,7 @@ create table if not exists units (
   phone text,
   email text,
   universal_key boolean default false,
+  status text default 'none' check (status in ('none', 'needs_work', 'in_progress', 'completed')),
   updated_at timestamp default now()
 );
 
@@ -19,8 +20,8 @@ create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
   unit_id uuid references units(id) on delete cascade,
   task text check (task in ('bathroom', 'kitchen', 'tub', 'cabinet', 'waterline', 'floor', 'beam')),
-  status text default 'needs_work' check (status in ('needs_work', 'in_progress', 'completed')),
-  priority text default 'low' check (priority in ('low', 'medium', 'urgent', 'emergency')),
+  status text default 'open' check (status in ('open', 'done')),
+  priority text default 'low' check (priority in ('low', 'medium', 'urgent')),
   date_added date,
   date_completed date,
   notes text,
@@ -28,6 +29,7 @@ create table if not exists projects (
 );
 
 -- Indexes for fast filtering/reporting
+create index if not exists idx_units_status on units(status);
 create index if not exists idx_projects_unit_id on projects(unit_id);
 create index if not exists idx_projects_task on projects(task);
 create index if not exists idx_projects_status on projects(status);
