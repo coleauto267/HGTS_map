@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { IconLayoutSidebar, IconLayoutSidebarRight, IconKey } from '@tabler/icons-react'
+import { IconLayoutSidebar, IconLayoutSidebarRight, IconKey, IconArrowsDiagonal, IconArrowsDiagonalMinimize } from '@tabler/icons-react'
 
 const STATUS_OPTIONS = [
   { value: 'none', label: 'No Status' },
@@ -36,20 +36,54 @@ const fieldClass = 'w-full bg-slate-800 border border-slate-700 text-white text-
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
-// One task (project row): a collapsed punch-list line by default, expands to
-// edit priority/notes and toggle done. Manages its own local edit state and
-// saves independently of the rest of the card, since it writes to a
-// different table (`projects`) than everything else in the popup.
-function TaskRow({ project, expanded, onToggleExpand, onUpdate, onToggleDone }) {
+// One collapsed punch-list row: checkbox to mark done at a glance, click
+// anywhere else on the row to drill into TaskDetail. Purely presentational —
+// no local edit state, since editing only happens in the detail view.
+function TaskRow({ project, onSelect, onToggleDone }) {
+  const isDone = project.status === 'done'
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800/70 hover:bg-slate-800 flex-shrink-0">
+      <input
+        type="checkbox"
+        checked={isDone}
+        onChange={(e) => { e.stopPropagation(); onToggleDone(isDone) }}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={isDone ? `Mark ${project.task} not done` : `Mark ${project.task} done`}
+        className="cursor-pointer accent-blue-600 w-4 h-4 flex-shrink-0"
+      />
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer"
+      >
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[project.priority]}`} />
+        <span className={`flex-1 text-sm capitalize truncate ${isDone ? 'line-through text-slate-500' : 'text-white'}`}>
+          {project.task}
+        </span>
+        <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+// A single task's editor — replaces the whole punch-list view (in the space
+// under the "Tasks" label) when a task is selected, rather than expanding
+// in place. "Back to tasks" returns to the list. Manages its own local edit
+// state and saves independently of the rest of the card, since it writes to
+// a different table (`projects`) than everything else in the popup.
+function TaskDetail({ project, onBack, onSaved, onUpdate, onToggleDone }) {
   const [priority, setPriority] = useState(project.priority)
   const [notes, setNotes] = useState(project.notes || '')
+  const [notesExpanded, setNotesExpanded] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     setPriority(project.priority)
     setNotes(project.notes || '')
-    setSaved(false)
+    setNotesExpanded(false)
   }, [project.id, project.priority, project.notes])
 
   const isDone = project.status === 'done'
@@ -58,8 +92,7 @@ function TaskRow({ project, expanded, onToggleExpand, onUpdate, onToggleDone }) 
     setSaving(true)
     try {
       await onUpdate({ priority, notes })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 1500)
+      onSaved()
     } catch (err) {
       console.error('Task save failed:', err)
     } finally {
@@ -67,83 +100,140 @@ function TaskRow({ project, expanded, onToggleExpand, onUpdate, onToggleDone }) 
     }
   }
 
+  const backArrow = (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    </svg>
+  )
+
+  // Notes expanded: replaces the whole task view (priority/checkbox/dates
+  // hidden) with a notes editor — capped to the card's own natural size
+  // (matches the fixed body height the card used before task-editing
+  // existed) so it never grows the card. Long notes scroll inside the
+  // textarea instead of pushing anything taller.
+  if (notesExpanded) {
+    return (
+      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-2.5 max-h-[17.5rem] flex flex-col">
+        <button
+          type="button"
+          onClick={() => setNotesExpanded(false)}
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer flex-shrink-0"
+        >
+          {backArrow}
+          Back to task
+        </button>
+
+        <div className="flex items-center justify-between flex-shrink-0">
+          <label className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+            Notes
+          </label>
+          <button
+            type="button"
+            onClick={() => setNotesExpanded(false)}
+            className="text-slate-500 hover:text-white transition-colors cursor-pointer"
+            aria-label="Collapse notes"
+          >
+            <IconArrowsDiagonalMinimize className="w-3.5 h-3.5" stroke={2} />
+          </button>
+        </div>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Add notes for this task..."
+          className="w-full flex-1 min-h-0 bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                     resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-600"
+        />
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer
+            bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+        >
+          {saving ? 'Saving…' : 'Save Task'}
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="rounded-lg border border-slate-700 overflow-hidden flex-shrink-0">
-      <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/70 hover:bg-slate-800">
+    <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-2.5">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+      >
+        {backArrow}
+        Back to tasks
+      </button>
+
+      <div className="flex items-center gap-2">
         <input
           type="checkbox"
           checked={isDone}
-          onChange={(e) => { e.stopPropagation(); onToggleDone(isDone) }}
-          onClick={(e) => e.stopPropagation()}
+          onChange={() => onToggleDone(isDone)}
           aria-label={isDone ? `Mark ${project.task} not done` : `Mark ${project.task} done`}
           className="cursor-pointer accent-blue-600 w-4 h-4 flex-shrink-0"
         />
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer"
-        >
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[project.priority]}`} />
-          <span className={`flex-1 text-sm capitalize truncate ${isDone ? 'line-through text-slate-500' : 'text-white'}`}>
-            {project.task}
-          </span>
-          <svg className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
-               fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[project.priority]}`} />
+        <h4 className={`text-sm font-semibold capitalize ${isDone ? 'line-through text-slate-500' : 'text-white'}`}>
+          {project.task}
+        </h4>
       </div>
 
-      {expanded && (
-        <div className="p-3 space-y-2.5 border-t border-slate-700">
-          <div>
-            <label className="block text-xs text-slate-400 font-medium mb-1 uppercase tracking-wider">
-              Priority
-            </label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                         focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {PRIORITY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
+      <div>
+        <label className="block text-xs text-slate-400 font-medium mb-1 uppercase tracking-wider">
+          Priority
+        </label>
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value)}
+          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                     focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {PRIORITY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
 
-          <div>
-            <label className="block text-xs text-slate-400 font-medium mb-1 uppercase tracking-wider">
-              Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Add notes for this task..."
-              className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                         resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-600"
-            />
-          </div>
-
-          <div className="text-xs text-slate-500">
-            Added {project.date_added || '—'}
-            {project.date_completed ? ` · Completed ${project.date_completed}` : ''}
-          </div>
-
+      <div>
+        <label className="block text-xs text-slate-400 font-medium mb-1 uppercase tracking-wider">
+          Notes
+        </label>
+        <div className="relative">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            placeholder="Add notes for this task..."
+            className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5 pr-7
+                       resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-600"
+          />
           <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`w-full py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer
-              ${saved
-                ? 'bg-green-600 text-white'
-                : 'bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed'
-              }`}
+            type="button"
+            onClick={() => setNotesExpanded(true)}
+            className="absolute top-1.5 right-1.5 text-slate-500 hover:text-white transition-colors cursor-pointer"
+            aria-label="Expand notes"
           >
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Task'}
+            <IconArrowsDiagonal className="w-3.5 h-3.5" stroke={2} />
           </button>
         </div>
-      )}
+      </div>
+
+      <div className="text-xs text-slate-500">
+        Added {project.date_added || '—'}
+        {project.date_completed ? ` · Completed ${project.date_completed}` : ''}
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="w-full py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer
+          bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {saving ? 'Saving…' : 'Save Task'}
+      </button>
     </div>
   )
 }
@@ -157,7 +247,7 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [activeView, setActiveView] = useState('status')
-  const [expandedTaskId, setExpandedTaskId] = useState(null)
+  const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [addingTask, setAddingTask] = useState(false)
   const [newTask, setNewTask] = useState('')
   const [newPriority, setNewPriority] = useState('low')
@@ -173,7 +263,7 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
     setUniversalKey(unit.universal_key || false)
     setSaved(false)
     setActiveView('status')
-    setExpandedTaskId(null)
+    setSelectedTaskId(null)
     setAddingTask(false)
   }, [unit.id])
 
@@ -219,6 +309,7 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
   }
 
   const projects = unit.projects || []
+  const selectedTask = projects.find((p) => p.id === selectedTaskId) || null
 
   return (
     <div className="w-96 rounded-xl shadow-2xl"
@@ -285,93 +376,108 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
       <div className="p-3 space-y-3">
         {activeView === 'status' && (
           <div className="space-y-3">
-            {/* Task list: punch-list style, one collapsible row per project */}
+            {/* Tasks: punch-list view, or one task's editor drilled into —
+                the two are mutually exclusive, not stacked/expanding. */}
             <div>
               <label className="block text-xs text-slate-400 font-medium mb-1.5 uppercase tracking-wider">
                 Tasks
               </label>
-              {projects.length > 0 && (
-                <div className="max-h-64 overflow-y-auto space-y-2 pr-0.5">
-                  {projects.map((project) => (
-                    <TaskRow
-                      key={project.id}
-                      project={project}
-                      expanded={expandedTaskId === project.id}
-                      onToggleExpand={() => setExpandedTaskId((id) => (id === project.id ? null : project.id))}
-                      onUpdate={(updates) => onUpdateProject(unit, project, updates)}
-                      onToggleDone={(isDone) => onUpdateProject(unit, project, {
-                        status: isDone ? 'open' : 'done',
-                        date_completed: isDone ? null : todayISO(),
-                      })}
-                    />
-                  ))}
-                </div>
-              )}
 
-              {addingTask ? (
-                <div className="rounded-lg border border-blue-500/50 bg-slate-800/50 p-3 space-y-2 mt-2">
-                  <select
-                    value={newTask}
-                    onChange={(e) => setNewTask(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select task type...</option>
-                    {TASK_OPTIONS.map((t) => (
-                      <option key={t} value={t} className="capitalize">{t}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={newPriority}
-                    onChange={(e) => setNewPriority(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {PRIORITY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <textarea
-                    value={newNotes}
-                    onChange={(e) => setNewNotes(e.target.value)}
-                    rows={2}
-                    placeholder="Notes (optional)"
-                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
-                               resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-600"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleAddTask}
-                      disabled={!newTask || addingSaving}
-                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500
-                                 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
-                    >
-                      {addingSaving ? 'Adding…' : 'Add Task'}
-                    </button>
-                    <button
-                      onClick={() => setAddingTask(false)}
-                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-700
-                                 text-slate-300 hover:bg-slate-800 transition-all cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+              {selectedTask ? (
+                <TaskDetail
+                  project={selectedTask}
+                  onBack={() => setSelectedTaskId(null)}
+                  onSaved={() => setSelectedTaskId(null)}
+                  onUpdate={(updates) => onUpdateProject(unit, selectedTask, updates)}
+                  onToggleDone={(isDone) => onUpdateProject(unit, selectedTask, {
+                    status: isDone ? 'open' : 'done',
+                    date_completed: isDone ? null : todayISO(),
+                  })}
+                />
               ) : (
-                <button
-                  onClick={() => setAddingTask(true)}
-                  className="w-full mt-2 py-1.5 rounded-lg text-xs font-semibold border border-dashed border-slate-600
-                             text-slate-400 hover:text-white hover:border-slate-400 transition-all cursor-pointer"
-                >
-                  + Add Task
-                </button>
+                <>
+                  {projects.length > 0 && (
+                    <div className="max-h-64 overflow-y-auto space-y-2 pr-0.5">
+                      {projects.map((project) => (
+                        <TaskRow
+                          key={project.id}
+                          project={project}
+                          onSelect={() => setSelectedTaskId(project.id)}
+                          onToggleDone={(isDone) => onUpdateProject(unit, project, {
+                            status: isDone ? 'open' : 'done',
+                            date_completed: isDone ? null : todayISO(),
+                          })}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {addingTask ? (
+                    <div className="rounded-lg border border-blue-500/50 bg-slate-800/50 p-3 space-y-2 mt-2">
+                      <select
+                        value={newTask}
+                        onChange={(e) => setNewTask(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select task type...</option>
+                        {TASK_OPTIONS.map((t) => (
+                          <option key={t} value={t} className="capitalize">{t}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={newPriority}
+                        onChange={(e) => setNewPriority(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {PRIORITY_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="date"
+                        value={newDate}
+                        onChange={(e) => setNewDate(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <textarea
+                        value={newNotes}
+                        onChange={(e) => setNewNotes(e.target.value)}
+                        rows={2}
+                        placeholder="Notes (optional)"
+                        className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5
+                                   resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-600"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleAddTask}
+                          disabled={!newTask || addingSaving}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500
+                                     text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        >
+                          {addingSaving ? 'Adding…' : 'Add Task'}
+                        </button>
+                        <button
+                          onClick={() => setAddingTask(false)}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-700
+                                     text-slate-300 hover:bg-slate-800 transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAddingTask(true)}
+                      className="w-full mt-2 py-1.5 rounded-lg text-xs font-semibold border border-dashed border-slate-600
+                                 text-slate-400 hover:text-white hover:border-slate-400 transition-all cursor-pointer"
+                    >
+                      + Add Task
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
