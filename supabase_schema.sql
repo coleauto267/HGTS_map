@@ -13,7 +13,8 @@ create table if not exists units (
   email text,
   universal_key boolean default false,
   status text default 'none' check (status in ('none', 'needs_work', 'in_progress', 'completed')),
-  updated_at timestamp default now()
+  updated_at timestamp default now(),        -- real UTC timestamp, trigger-maintained
+  updated_at_est text                        -- same moment, legible EST clock time, trigger-maintained
 );
 
 create table if not exists projects (
@@ -25,8 +26,32 @@ create table if not exists projects (
   date_added date,
   date_completed date,
   notes text,
-  updated_at timestamp default now()
+  updated_at timestamp default now(),        -- real UTC timestamp, trigger-maintained
+  updated_at_est text                        -- same moment, legible EST clock time, trigger-maintained
 );
+
+-- Keep updated_at / updated_at_est current on every write, in Postgres rather
+-- than app code. updated_at stays a real UTC timestamp (sortable, good for
+-- reporting); updated_at_est is the same instant rendered as US Eastern
+-- clock time (MM/DD/YYYY HH:MM:SS AM/PM) so the tables are legible raw.
+create or replace function set_updated_at() returns trigger as $$
+begin
+  new.updated_at := now();
+  new.updated_at_est := to_char(
+    now() at time zone 'America/New_York',
+    'MM/DD/YYYY HH12:MI:SS AM'
+  );
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger units_set_updated_at
+  before insert or update on units
+  for each row execute function set_updated_at();
+
+create trigger projects_set_updated_at
+  before insert or update on projects
+  for each row execute function set_updated_at();
 
 -- Indexes for fast filtering/reporting
 create index if not exists idx_units_status on units(status);

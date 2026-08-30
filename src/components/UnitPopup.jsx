@@ -34,7 +34,11 @@ const PRIORITY_DOT = {
 const fieldClass = 'w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 ' +
   'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-600'
 
-const todayISO = () => new Date().toISOString().slice(0, 10)
+// "Today" as yyyy-mm-dd in US Eastern (New York), DST-aware — not UTC.
+// `toISOString()` is UTC, so an evening in Eastern already reads as tomorrow.
+// en-CA formats as yyyy-mm-dd.
+const todayISO = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
 
 // Supabase stores dates as ISO (yyyy-mm-dd); show them US-style m/d/yyyy.
 // Split the string rather than `new Date(iso)` — the latter parses as UTC
@@ -328,7 +332,9 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
     setActiveView('status')
     setSelectedTaskId(null)
     setAddingTask(false)
-  }, [unit.id])
+    // Keyed on full_address, not id: two never-saved units both have id
+    // null, so switching between them wouldn't reset the form otherwise.
+  }, [unit.full_address])
 
   const handleSave = async () => {
     setSaving(true)
@@ -378,8 +384,7 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
   const selectedTask = projects.find((p) => p.id === selectedTaskId) || null
 
   return (
-    <div className="w-96 rounded-xl shadow-2xl"
-         style={{ background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)' }}>
+    <div className="w-full min-h-full">
       {/* Header spans the full width of the card */}
       <div className="flex items-start justify-between p-3 pb-2 border-b-2 border-white/30">
         <div className="flex-1 min-w-0">
@@ -532,7 +537,7 @@ export default function UnitPopup({ unit, onClose, onSave, onAddProject, onUpdat
               ) : (
                 <>
                   {projects.length > 0 && (
-                    <div className="max-h-64 overflow-y-auto space-y-2 pr-0.5">
+                    <div className="space-y-2 pr-0.5">
                       {projects.map((project) => (
                         <TaskRow
                           key={project.id}

@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
+// NOTE: `updated_at` (real UTC timestamp) and `updated_at_est` (legible EST
+// clock-time text) are both maintained by a Postgres BEFORE INSERT/UPDATE
+// trigger — see supabase_schema.sql / workings/timestamp_est_column.sql.
+// The app deliberately does not send either one.
+
 export function useUnits() {
   const [units, setUnits] = useState([])
   const [loading, setLoading] = useState(true)
@@ -82,13 +87,12 @@ export function useUnits() {
   // to `units`. Takes the full unit object (not just id) so we can insert if
   // it hasn't been saved to Supabase yet (id === null).
   const updateUnit = useCallback(async (unit, updates) => {
-    const now = new Date().toISOString()
     let dbRow
 
     if (unit.id) {
       const { data, error: err } = await supabase
         .from('units')
-        .update({ ...updates, updated_at: now })
+        .update(updates)
         .eq('id', unit.id)
         .select()
         .single()
@@ -106,7 +110,6 @@ export function useUnits() {
           lat: unit.lat,
           lon: unit.lon,
           ...updates,
-          updated_at: now,
         }, { onConflict: 'full_address' })
         .select()
         .single()
@@ -189,10 +192,9 @@ export function useUnits() {
   // Updates an existing task (project row) — priority/notes edits, or
   // flipping status between 'open' and 'done'.
   const updateProject = useCallback(async (unit, project, updates) => {
-    const now = new Date().toISOString()
     const { data, error: err } = await supabase
       .from('projects')
-      .update({ ...updates, updated_at: now })
+      .update(updates)
       .eq('id', project.id)
       .select()
       .single()
