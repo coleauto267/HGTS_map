@@ -41,7 +41,25 @@ function applySelectionStyles(map, addr) {
   map.setPaintProperty(URGENT_RING_LAYER_ID, 'circle-stroke-opacity', dim(1, 0.15))
 }
 
-function addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef) {
+// Combined status + task-type filter, ANDed. A dot shows only if it matches
+// the active status filter (if any) AND is in the task-match address set (if
+// task filters are active). `taskMatchAddresses`: null = no task filtering;
+// [] = task filters active but nothing matches -> hide everything.
+function applyFilters(map, activeFilter, taskMatchAddresses) {
+  if (!map.getLayer(LAYER_ID)) return
+  const conds = []
+  if (activeFilter) conds.push(['==', ['get', 'status'], activeFilter])
+  if (taskMatchAddresses) conds.push(['in', ['get', 'full_address'], ['literal', taskMatchAddresses]])
+
+  const filter = conds.length === 0 ? null : conds.length === 1 ? conds[0] : ['all', ...conds]
+  map.setFilter(LAYER_ID, filter)
+  map.setFilter(LABEL_LAYER_ID, filter)
+
+  const hasRingExpr = ['in', ['get', 'ring_priority'], ['literal', ['medium', 'urgent']]]
+  map.setFilter(URGENT_RING_LAYER_ID, conds.length === 0 ? hasRingExpr : ['all', hasRingExpr, ...conds])
+}
+
+function addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef, activeFilterRef, taskMatchAddrRef) {
   // The basemap draws its own house numbers; hide them so they don't
   // double up with our units-labels layer. Runs again after every style
   // swap since setStyle restores the basemap's own layers.
@@ -179,9 +197,10 @@ function addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAd
   map.on('click', LAYER_ID, handleUnitClick)
   map.on('click', LABEL_LAYER_ID, handleUnitClick)
 
-  // Re-apply the current selection after a fresh layer build (initial load
-  // and every style swap, which wipes custom layers).
+  // Re-apply the current selection + filters after a fresh layer build
+  // (initial load and every style swap, which wipes custom layers).
   applySelectionStyles(map, selectedAddrRef.current)
+  applyFilters(map, activeFilterRef.current, taskMatchAddrRef.current)
 }
 
 // The map needs one color + one ring per dot, but priority now lives on
@@ -219,6 +238,7 @@ function unitsToGeoJSON(units) {
 export default function MapView({
   units,
   activeFilter,
+  taskMatchAddresses,
   selectedAddress,
   onSelectUnit,
   mapStyle,
@@ -231,6 +251,8 @@ export default function MapView({
   // latest values without re-binding listeners.
   const onSelectUnitRef = useRef(onSelectUnit)
   const selectedAddrRef = useRef(selectedAddress)
+  const activeFilterRef = useRef(activeFilter)
+  const taskMatchAddrRef = useRef(taskMatchAddresses)
   // Prevents the mapStyle effect from calling setStyle on the initial render,
   // which would cancel the in-progress map load and drop the first data update.
   const mapStyleReady = useRef(false)
@@ -241,6 +263,8 @@ export default function MapView({
   useEffect(() => { unitsRef.current = units }, [units])
   useEffect(() => { onSelectUnitRef.current = onSelectUnit }, [onSelectUnit])
   useEffect(() => { selectedAddrRef.current = selectedAddress }, [selectedAddress])
+  useEffect(() => { activeFilterRef.current = activeFilter }, [activeFilter])
+  useEffect(() => { taskMatchAddrRef.current = taskMatchAddresses }, [taskMatchAddresses])
 
   // Initialize map once
   useEffect(() => {
@@ -258,7 +282,7 @@ export default function MapView({
     map.addControl(new mapboxgl.ScaleControl(), 'bottom-left')
 
     map.on('load', () => {
-      addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef)
+      addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef, activeFilterRef, taskMatchAddrRef)
 
       // Click on empty map = clear selection (closes the side panel)
       map.on('click', (e) => {
@@ -291,19 +315,15 @@ export default function MapView({
     if (source) source.setData(unitsToGeoJSON(units))
   }, [units])
 
-  // Apply/remove filter when activeFilter changes
+  // Re-apply the combined status + task-type filter whenever either changes.
+  // Gated on mapReady (not isStyleLoaded) so a filter set before the map
+  // finishes loading isn't silently dropped; addMapLayers re-applies it
+  // after style swaps. See applyFilters().
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
-    const filter = activeFilter ? ['==', ['get', 'status'], activeFilter] : null
-    map.setFilter(LAYER_ID, filter)
-    map.setFilter(LABEL_LAYER_ID, filter)
-    const hasRingExpr = ['in', ['get', 'ring_priority'], ['literal', ['medium', 'urgent']]]
-    const ringFilter = activeFilter
-      ? ['all', hasRingExpr, ['==', ['get', 'status'], activeFilter]]
-      : hasRingExpr
-    map.setFilter(URGENT_RING_LAYER_ID, ringFilter)
-  }, [activeFilter])
+    if (!map || !mapReady) return
+    applyFilters(map, activeFilter, taskMatchAddresses)
+  }, [activeFilter, taskMatchAddresses, mapReady])
 
   // Selection: grow the chosen dot, fade the rest, and center the map on it.
   // Same path for a dot click and an address search — both just change
@@ -345,7 +365,7 @@ export default function MapView({
 
     // Re-add layers after style change
     map.once('style.load', () => {
-      addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef)
+      addMapLayers(map, unitsRef, hoveredAddrRef, onSelectUnitRef, selectedAddrRef, activeFilterRef, taskMatchAddrRef)
     })
     map.setStyle(styleUrl)
   }, [mapStyle])

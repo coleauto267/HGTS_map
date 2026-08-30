@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import MapView from './components/MapView'
 import StatsPanel from './components/StatsPanel'
 import UnitPopup from './components/UnitPopup'
@@ -12,10 +12,27 @@ export default function App() {
   // so the panel always sees fresh data after a save.
   const [selectedAddress, setSelectedAddress] = useState(null)
   const [mapStyle, setMapStyle] = useState('streets')
+  // Task-type search filters (e.g. ['bathroom', 'kitchen']). AND logic: a
+  // unit must have every one of these as an OPEN task to stay on the map.
+  const [taskFilters, setTaskFilters] = useState([])
 
   const selectedUnit = selectedAddress
     ? units.find((u) => u.full_address === selectedAddress) || null
     : null
+
+  // Addresses of units matching ALL active task filters (open tasks only).
+  // null = no task filtering; [] = filtering active but nothing matches.
+  const taskMatchAddresses = useMemo(() => {
+    if (taskFilters.length === 0) return null
+    return units
+      .filter((u) => {
+        const openTasks = new Set(
+          (u.projects || []).filter((p) => p.status === 'open').map((p) => p.task)
+        )
+        return taskFilters.every((t) => openTasks.has(t))
+      })
+      .map((u) => u.full_address)
+  }, [units, taskFilters])
 
   const handleSearch = useCallback((query) => {
     if (!query) return
@@ -34,6 +51,7 @@ export default function App() {
         <MapView
           units={units}
           activeFilter={activeFilter}
+          taskMatchAddresses={taskMatchAddresses}
           selectedAddress={selectedAddress}
           onSelectUnit={setSelectedAddress}
           mapStyle={mapStyle}
@@ -47,6 +65,9 @@ export default function App() {
           onFilterChange={setActiveFilter}
           onSearch={handleSearch}
           onAddressSelect={(unit) => setSelectedAddress(unit.full_address)}
+          taskFilters={taskFilters}
+          onTaskFiltersChange={setTaskFilters}
+          taskMatchCount={taskMatchAddresses?.length ?? null}
         />
 
         {/* Map style toggle */}

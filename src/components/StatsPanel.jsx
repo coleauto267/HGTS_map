@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { TASK_OPTIONS } from '../constants'
 
 const STATUS_CONFIG = [
   {
@@ -21,9 +22,36 @@ const STATUS_CONFIG = [
 
 const LISTABLE_STATUSES = ['needs_work', 'in_progress', 'completed']
 
-export default function StatsPanel({ units, activeFilter, onFilterChange, onSearch, onAddressSelect, loading }) {
+export default function StatsPanel({
+  units,
+  activeFilter,
+  onFilterChange,
+  onSearch,
+  onAddressSelect,
+  loading,
+  taskFilters = [],
+  onTaskFiltersChange,
+  taskMatchCount = null,
+}) {
   const [searchValue, setSearchValue] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+
+  // Task-type suggestions for what's currently typed — prefix match against
+  // the fixed list, excluding ones already added as filters.
+  const taskSuggestions = useMemo(() => {
+    const q = searchValue.trim().toLowerCase()
+    if (!q) return []
+    return TASK_OPTIONS.filter((t) => t.startsWith(q) && !taskFilters.includes(t))
+  }, [searchValue, taskFilters])
+
+  const addTaskFilter = (task) => {
+    onTaskFiltersChange?.([...taskFilters, task])
+    setSearchValue('')
+  }
+  const removeTaskFilter = (task) => {
+    onTaskFiltersChange?.(taskFilters.filter((t) => t !== task))
+  }
 
   const counts = useMemo(() => {
     const c = { none: 0, needs_work: 0, in_progress: 0, completed: 0 }
@@ -79,14 +107,16 @@ export default function StatsPanel({ units, activeFilter, onFilterChange, onSear
 
       {!collapsed && (
         <>
-          {/* Search */}
+          {/* Search — address free-text (Go) plus task-type filter chips */}
           <div className="px-3 py-2 border-b-2 border-white/25">
-            <form onSubmit={handleSearch} className="flex gap-2">
+            <form onSubmit={handleSearch} className="relative flex gap-2">
               <input
                 type="text"
                 value={searchValue}
                 onChange={handleSearchInput}
-                placeholder="Search address…"
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+                placeholder="Address, or task (e.g. bath…)"
                 className="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg
                            px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500
                            placeholder-slate-600 min-w-0"
@@ -98,7 +128,57 @@ export default function StatsPanel({ units, activeFilter, onFilterChange, onSear
               >
                 Go
               </button>
+
+              {/* Task suggestions — click one to add it as a filter */}
+              {searchFocused && taskSuggestions.length > 0 && (
+                <ul className="absolute left-0 right-0 top-full mt-1 z-30 rounded-lg border border-slate-700
+                               bg-slate-800 shadow-xl overflow-hidden">
+                  {taskSuggestions.map((task) => (
+                    <li key={task}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => addTaskFilter(task)}
+                        className="w-full text-left px-3 py-1.5 text-sm text-slate-200 capitalize
+                                   hover:bg-blue-600/30 transition-colors cursor-pointer"
+                      >
+                        {task}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </form>
+
+            {/* Active task filters (AND logic) */}
+            {taskFilters.length > 0 && (
+              <>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {taskFilters.map((task) => (
+                    <span
+                      key={task}
+                      className="inline-flex items-center gap-1 rounded-md border border-blue-500/40
+                                 bg-blue-600/20 pl-2 pr-1 py-0.5 text-xs text-blue-100 capitalize"
+                    >
+                      {task}
+                      <button
+                        type="button"
+                        onClick={() => removeTaskFilter(task)}
+                        aria-label={`Remove ${task} filter`}
+                        className="text-blue-300 hover:text-white transition-colors cursor-pointer leading-none"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {taskMatchCount ?? 0} propert{taskMatchCount === 1 ? 'y' : 'ies'} with all selected tasks open
+                </p>
+              </>
+            )}
           </div>
 
           {/* Legend / Stats */}

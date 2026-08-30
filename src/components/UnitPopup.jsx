@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { IconLayoutSidebar, IconLayoutSidebarRight, IconKey, IconArrowsDiagonal, IconArrowsDiagonalMinimize, IconTrash } from '@tabler/icons-react'
+import { TASK_OPTIONS } from '../constants'
 
 const STATUS_OPTIONS = [
   { value: 'none', label: 'No Status' },
@@ -7,8 +8,6 @@ const STATUS_OPTIONS = [
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
 ]
-
-const TASK_OPTIONS = ['bathroom', 'kitchen', 'tub', 'cabinet', 'waterline', 'floor', 'beam']
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low' },
