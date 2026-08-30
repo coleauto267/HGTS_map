@@ -20,19 +20,22 @@ export default function App() {
     ? units.find((u) => u.full_address === selectedAddress) || null
     : null
 
-  // Addresses of units matching ALL active task filters (open tasks only).
+  // Units matching ALL active task filters (open tasks only).
   // null = no task filtering; [] = filtering active but nothing matches.
-  const taskMatchAddresses = useMemo(() => {
+  const taskMatchUnits = useMemo(() => {
     if (taskFilters.length === 0) return null
-    return units
-      .filter((u) => {
-        const openTasks = new Set(
-          (u.projects || []).filter((p) => p.status === 'open').map((p) => p.task)
-        )
-        return taskFilters.every((t) => openTasks.has(t))
-      })
-      .map((u) => u.full_address)
+    return units.filter((u) => {
+      const openTasks = new Set(
+        (u.projects || []).filter((p) => p.status === 'open').map((p) => p.task)
+      )
+      return taskFilters.every((t) => openTasks.has(t))
+    })
   }, [units, taskFilters])
+
+  const taskMatchAddresses = useMemo(
+    () => (taskMatchUnits ? taskMatchUnits.map((u) => u.full_address) : null),
+    [taskMatchUnits]
+  )
 
   const handleSearch = useCallback((query) => {
     if (!query) return
@@ -67,7 +70,7 @@ export default function App() {
           onAddressSelect={(unit) => setSelectedAddress(unit.full_address)}
           taskFilters={taskFilters}
           onTaskFiltersChange={setTaskFilters}
-          taskMatchCount={taskMatchAddresses?.length ?? null}
+          taskMatchUnits={taskMatchUnits}
         />
 
         {/* Map style toggle */}

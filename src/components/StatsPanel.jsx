@@ -31,7 +31,7 @@ export default function StatsPanel({
   loading,
   taskFilters = [],
   onTaskFiltersChange,
-  taskMatchCount = null,
+  taskMatchUnits = null,
 }) {
   const [searchValue, setSearchValue] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
@@ -61,12 +61,23 @@ export default function StatsPanel({
     return c
   }, [units])
 
-  const filteredUnits = useMemo(() => {
-    if (!LISTABLE_STATUSES.includes(activeFilter)) return []
-    return units
-      .filter((u) => u.status === activeFilter)
-      .sort((a, b) => a.full_address.localeCompare(b.full_address, undefined, { numeric: true }))
-  }, [units, activeFilter])
+  // The clickable address list under the legend. Shows whenever a listable
+  // status filter and/or one or more task filters are active, and reflects
+  // both together (same AND the map applies).
+  const statusListable = LISTABLE_STATUSES.includes(activeFilter)
+  const taskActive = taskFilters.length > 0
+  const listedUnits = useMemo(() => {
+    if (!statusListable && !taskActive) return []
+    let list = units
+    if (statusListable) list = list.filter((u) => u.status === activeFilter)
+    if (taskActive) {
+      const matchSet = new Set((taskMatchUnits || []).map((u) => u.full_address))
+      list = list.filter((u) => matchSet.has(u.full_address))
+    }
+    return [...list].sort((a, b) =>
+      a.full_address.localeCompare(b.full_address, undefined, { numeric: true })
+    )
+  }, [units, activeFilter, statusListable, taskActive, taskMatchUnits])
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -175,7 +186,7 @@ export default function StatsPanel({
                   ))}
                 </div>
                 <p className="mt-1.5 text-xs text-slate-500">
-                  {taskMatchCount ?? 0} propert{taskMatchCount === 1 ? 'y' : 'ies'} with all selected tasks open
+                  {taskMatchUnits?.length ?? 0} propert{taskMatchUnits?.length === 1 ? 'y' : 'ies'} with all selected tasks open
                 </p>
               </>
             )}
@@ -252,13 +263,13 @@ export default function StatsPanel({
               </div>
             )}
 
-            {!loading && LISTABLE_STATUSES.includes(activeFilter) && (
+            {!loading && (statusListable || taskActive) && (
               <div className="pt-2 mt-1 border-t-2 border-white/25">
                 <p className="text-slate-400 text-xs uppercase tracking-wider font-medium mb-1.5 px-0.5">
-                  Addresses ({filteredUnits.length})
+                  Addresses ({listedUnits.length})
                 </p>
                 <ul className="address-list-scroll max-h-48 overflow-y-auto space-y-0.5">
-                  {filteredUnits.map((unit) => (
+                  {listedUnits.map((unit) => (
                     <li key={unit.id ?? unit.full_address}>
                       <button
                         onClick={() => onAddressSelect(unit)}
