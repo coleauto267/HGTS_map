@@ -1,6 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
+// "Now" as 'YYYY-MM-DD HH:mm:ss.SSS' wall-clock in US Eastern (New York),
+// DST-aware. The updated_at columns are plain `timestamp`, so Postgres stores
+// these digits verbatim — the table then reads in NY time instead of UTC.
+// Same idea as todayISO() in UnitPopup.jsx.
+function easternNow() {
+  const d = new Date()
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(d).reduce((o, x) => ((o[x.type] = x.value), o), {})
+  const hour = p.hour === '24' ? '00' : p.hour // some engines emit '24' at midnight
+  const ms = String(d.getMilliseconds()).padStart(3, '0')
+  return `${p.year}-${p.month}-${p.day} ${hour}:${p.minute}:${p.second}.${ms}`
+}
+
 export function useUnits() {
   const [units, setUnits] = useState([])
   const [loading, setLoading] = useState(true)
@@ -82,7 +98,7 @@ export function useUnits() {
   // to `units`. Takes the full unit object (not just id) so we can insert if
   // it hasn't been saved to Supabase yet (id === null).
   const updateUnit = useCallback(async (unit, updates) => {
-    const now = new Date().toISOString()
+    const now = easternNow()
     let dbRow
 
     if (unit.id) {
@@ -146,6 +162,7 @@ export function useUnits() {
         street_name: unit.street_name,
         lat: unit.lat,
         lon: unit.lon,
+        updated_at: easternNow(),
       }, { onConflict: 'full_address' })
       .select()
       .single()
@@ -159,7 +176,7 @@ export function useUnits() {
     const unitId = await ensureUnitRow(unit)
     const { data, error: err } = await supabase
       .from('projects')
-      .insert({ unit_id: unitId, ...projectData })
+      .insert({ unit_id: unitId, ...projectData, updated_at: easternNow() })
       .select()
       .single()
     if (err) throw err
@@ -189,7 +206,7 @@ export function useUnits() {
   // Updates an existing task (project row) — priority/notes edits, or
   // flipping status between 'open' and 'done'.
   const updateProject = useCallback(async (unit, project, updates) => {
-    const now = new Date().toISOString()
+    const now = easternNow()
     const { data, error: err } = await supabase
       .from('projects')
       .update({ ...updates, updated_at: now })
