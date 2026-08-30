@@ -1,21 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
-// "Now" as 'YYYY-MM-DD HH:mm:ss.SSS' wall-clock in US Eastern (New York),
-// DST-aware. The updated_at columns are plain `timestamp`, so Postgres stores
-// these digits verbatim — the table then reads in NY time instead of UTC.
-// Same idea as todayISO() in UnitPopup.jsx.
-function easternNow() {
-  const d = new Date()
-  const p = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  }).formatToParts(d).reduce((o, x) => ((o[x.type] = x.value), o), {})
-  const hour = p.hour === '24' ? '00' : p.hour // some engines emit '24' at midnight
-  const ms = String(d.getMilliseconds()).padStart(3, '0')
-  return `${p.year}-${p.month}-${p.day} ${hour}:${p.minute}:${p.second}.${ms}`
-}
+// NOTE: `updated_at` (real UTC timestamp) and `updated_at_est` (legible EST
+// clock-time text) are both maintained by a Postgres BEFORE INSERT/UPDATE
+// trigger — see supabase_schema.sql / workings/timestamp_est_column.sql.
+// The app deliberately does not send either one.
 
 export function useUnits() {
   const [units, setUnits] = useState([])
@@ -98,13 +87,12 @@ export function useUnits() {
   // to `units`. Takes the full unit object (not just id) so we can insert if
   // it hasn't been saved to Supabase yet (id === null).
   const updateUnit = useCallback(async (unit, updates) => {
-    const now = easternNow()
     let dbRow
 
     if (unit.id) {
       const { data, error: err } = await supabase
         .from('units')
-        .update({ ...updates, updated_at: now })
+        .update(updates)
         .eq('id', unit.id)
         .select()
         .single()
@@ -122,7 +110,6 @@ export function useUnits() {
           lat: unit.lat,
           lon: unit.lon,
           ...updates,
-          updated_at: now,
         }, { onConflict: 'full_address' })
         .select()
         .single()
@@ -162,7 +149,6 @@ export function useUnits() {
         street_name: unit.street_name,
         lat: unit.lat,
         lon: unit.lon,
-        updated_at: easternNow(),
       }, { onConflict: 'full_address' })
       .select()
       .single()
@@ -176,7 +162,7 @@ export function useUnits() {
     const unitId = await ensureUnitRow(unit)
     const { data, error: err } = await supabase
       .from('projects')
-      .insert({ unit_id: unitId, ...projectData, updated_at: easternNow() })
+      .insert({ unit_id: unitId, ...projectData })
       .select()
       .single()
     if (err) throw err
@@ -206,10 +192,9 @@ export function useUnits() {
   // Updates an existing task (project row) — priority/notes edits, or
   // flipping status between 'open' and 'done'.
   const updateProject = useCallback(async (unit, project, updates) => {
-    const now = easternNow()
     const { data, error: err } = await supabase
       .from('projects')
-      .update({ ...updates, updated_at: now })
+      .update(updates)
       .eq('id', project.id)
       .select()
       .single()
